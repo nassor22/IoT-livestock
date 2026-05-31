@@ -3,7 +3,9 @@
  * Handles individual animal detail view with charts
  */
 
-document.addEventListener('DOMContentLoaded', function() {
+const SENSOR_API_BASE = 'http://localhost:8000';
+
+document.addEventListener('DOMContentLoaded', async function() {
     // Check authentication
     const user = checkAuth();
     if (!user) return;
@@ -16,14 +18,49 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Get selected animal
     const animalId = sessionStorage.getItem('selectedAnimal') || 'COW-001';
-    const animal = getLivestockById(animalId);
-    
-    if (animal) {
-        renderAnimalDetail(animal);
-        initCharts(animalId);
-        initPeriodButtons();
-    }
+    const animal = getLivestockById(animalId) || getFallbackAnimal(animalId);
+
+    renderAnimalDetail(animal);
+    initPeriodButtons();
+
+    await loadSensorData(animalId, animal);
 });
+
+function getFallbackAnimal(animalId) {
+    return {
+        id: animalId,
+        type: 'Livestock',
+        age: 'Unknown',
+        icon: 'fa-cow',
+        status: 'normal',
+        statusText: 'Normal',
+        temperature: null,
+        activity: 'Unknown',
+        rumination: 'Unknown',
+        lastUpdate: 'Waiting for sensor data'
+    };
+}
+
+async function loadSensorData(animalId, animal) {
+    try {
+        const [latestResponse, historyResponse] = await Promise.all([
+            fetch(`${SENSOR_API_BASE}/api/livestock/${encodeURIComponent(animalId)}/latest`),
+            fetch(`${SENSOR_API_BASE}/api/livestock/${encodeURIComponent(animalId)}/readings?limit=7`)
+        ]);
+
+        const latestReading = latestResponse.ok ? await latestResponse.json() : null;
+        const historyReadings = historyResponse.ok ? await historyResponse.json() : [];
+
+        if (latestReading) {
+            renderSensorReadings(animal, latestReading);
+        }
+
+        initCharts(animalId, historyReadings);
+    } catch (error) {
+        console.warn('Live sensor data unavailable, using demo chart data.', error);
+        initCharts(animalId, []);
+    }
+}
 
 // Render animal details
 function renderAnimalDetail(animal) {
@@ -40,29 +77,42 @@ function renderAnimalDetail(animal) {
     `;
     
     // Current readings
-    document.getElementById('bodyTemp').textContent = `${animal.temperature}°C`;
-    document.getElementById('bodyTemp').className = `status-value ${animal.temperature > 39.5 ? 'high' : animal.temperature < 38 ? 'low' : 'normal'}`;
+    updateReading('bodyTemp', animal.temperature == null ? '--°C' : `${animal.temperature}°C`, getTemperatureClass(animal.temperature));
     
-    document.getElementById('activityLevel').textContent = animal.activity;
-    document.getElementById('activityLevel').className = `status-value ${animal.activity === 'Low' || animal.activity === 'Very Low' ? 'low' : 'normal'}`;
+    updateReading('pulseRate', '-- bpm', 'status-value low');
     
-    document.getElementById('rumination').textContent = animal.rumination;
-    document.getElementById('rumination').className = `status-value ${animal.rumination === 'Reduced' ? 'low' : 'normal'}`;
+    updateReading('rumination', animal.rumination, `status-value ${animal.rumination === 'Reduced' ? 'low' : 'normal'}`);
     
-    document.getElementById('lastUpdated').textContent = animal.lastUpdate;
+    updateReading('lastUpdated', animal.lastUpdate, 'status-value');
+
+    updateReading('envTemp', '--', 'env-value');
+    updateReading('envHumidity', '--', 'env-value');
+    updateReading('envHeatIndex', '--', 'env-value');
+    updateReading('envGps', 'No Fix', 'env-value');
 }
 
 // Initialize charts
-function initCharts(animalId) {
+function initCharts(animalId, historyReadings = []) {
+    const orderedReadings = Array.isArray(historyReadings) ? [...historyReadings].reverse() : [];
+    const chartLabels = orderedReadings.length > 0
+        ? orderedReadings.map(reading => formatHistoryLabel(reading.timestamp))
+        : TEMPERATURE_HISTORY.labels;
+
     // Temperature Chart
     const tempCtx = document.getElementById('tempChart').getContext('2d');
     
-    const tempData = TEMPERATURE_HISTORY.datasets[animalId] || [38.5, 38.5, 38.6, 38.5, 38.4, 38.5, 38.5];
+    const tempData = orderedReadings.length > 0
+        ? orderedReadings.map(reading => reading.body_temp ?? reading.bodyTemperature ?? null).filter(value => value !== null)
+        : (TEMPERATURE_HISTORY.datasets[animalId] || [38.5, 38.5, 38.6, 38.5, 38.4, 38.5, 38.5]);
+
+    if (window.tempChart) {
+        window.tempChart.destroy();
+    }
     
     window.tempChart = new Chart(tempCtx, {
         type: 'line',
         data: {
-            labels: TEMPERATURE_HISTORY.labels,
+            labels: chartLabels,
             datasets: [{
                 label: 'Temperature (°C)',
                 data: tempData,
@@ -108,18 +158,24 @@ function initCharts(animalId) {
         }
     });
     
-    // Activity Chart
+    // Pulse Rate Chart
     const activityCtx = document.getElementById('activityChart').getContext('2d');
     
-    const activityData = ACTIVITY_HISTORY.datasets[animalId] || [65, 70, 75, 80, 75, 70, 65];
+    const pulseData = orderedReadings.length > 0
+        ? orderedReadings.map(reading => reading.pulse_rate ?? reading.heart_rate ?? reading.activity ?? null).filter(value => value !== null)
+        : (ACTIVITY_HISTORY.datasets[animalId] || [65, 70, 75, 80, 75, 70, 65]);
+
+    if (window.activityChart) {
+        window.activityChart.destroy();
+    }
     
     window.activityChart = new Chart(activityCtx, {
         type: 'bar',
         data: {
-            labels: ACTIVITY_HISTORY.labels,
+            labels: chartLabels,
             datasets: [{
-                label: 'Activity Level',
-                data: activityData,
+                label: orderedReadings.length > 0 ? 'Pulse Rate' : 'Activity Level',
+                data: pulseData,
                 backgroundColor: 'rgba(46, 125, 50, 0.7)',
                 borderColor: '#2E7D32',
                 borderWidth: 1,
@@ -152,6 +208,97 @@ function initCharts(animalId) {
                 }
             }
         }
+    });
+}
+
+function renderSensorReadings(animal, reading) {
+    const bodyTemp = reading.body_temp ?? reading.bodyTemperature ?? animal.temperature;
+    const pulseRate = reading.pulse_rate ?? reading.heart_rate ?? reading.activity;
+    const ambientTemp = reading.ambient_temp;
+    const humidity = reading.humidity;
+    const thi = reading.thi;
+    const gpsData = reading.gps_data ?? reading.gpsData;
+    const timestamp = reading.timestamp ? new Date(reading.timestamp) : null;
+
+    if (bodyTemp != null) {
+        updateReading('bodyTemp', `${Number(bodyTemp).toFixed(1)}°C`, getTemperatureClass(Number(bodyTemp)));
+    }
+
+    if (pulseRate != null) {
+        updateReading('pulseRate', `${Math.round(Number(pulseRate))} bpm`, getPulseClass(Number(pulseRate)));
+    }
+
+    if (ambientTemp != null) {
+        updateReading('envTemp', `${Number(ambientTemp).toFixed(1)}°C`, 'env-value');
+    }
+
+    if (humidity != null) {
+        updateReading('envHumidity', `${Math.round(Number(humidity))}%`, 'env-value');
+    }
+
+    if (thi != null) {
+        updateReading('envHeatIndex', Number(thi).toFixed(1), 'env-value');
+    }
+
+    if (gpsData != null) {
+        updateReading('envGps', gpsData, 'env-value');
+    }
+
+    updateReading('lastUpdated', timestamp ? timestamp.toLocaleString() : animal.lastUpdate, 'status-value');
+
+    const statusBadge = document.getElementById('animalStatus');
+    const resolvedStatus = getReadingStatus(bodyTemp, pulseRate, thi);
+    statusBadge.className = `status-badge status-${resolvedStatus}`;
+    statusBadge.innerHTML = `
+        <i class="fas ${resolvedStatus === 'normal' ? 'fa-check-circle' : resolvedStatus === 'warning' ? 'fa-exclamation-circle' : 'fa-times-circle'}"></i>
+        ${resolvedStatus === 'normal' ? 'Normal' : resolvedStatus === 'warning' ? 'Warning' : 'Alert'}
+    `;
+}
+
+function updateReading(elementId, value, className) {
+    const element = document.getElementById(elementId);
+    if (!element) return;
+
+    element.textContent = value;
+    if (className) {
+        element.className = className;
+    }
+}
+
+function getTemperatureClass(temperature) {
+    if (temperature == null) return 'status-value';
+    if (temperature > 39.5) return 'status-value high';
+    if (temperature < 38) return 'status-value low';
+    return 'status-value normal';
+}
+
+function getPulseClass(pulseRate) {
+    if (pulseRate == null) return 'status-value';
+    if (pulseRate > 100) return 'status-value high';
+    if (pulseRate < 50) return 'status-value low';
+    return 'status-value normal';
+}
+
+function getReadingStatus(bodyTemp, pulseRate, thi) {
+    if ((bodyTemp != null && bodyTemp > 39.8) || (pulseRate != null && pulseRate > 110) || (thi != null && thi >= 72)) {
+        return 'alert';
+    }
+
+    if ((bodyTemp != null && bodyTemp > 39.2) || (pulseRate != null && (pulseRate < 50 || pulseRate > 100))) {
+        return 'warning';
+    }
+
+    return 'normal';
+}
+
+function formatHistoryLabel(timestamp) {
+    if (!timestamp) {
+        return '';
+    }
+
+    return new Date(timestamp).toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit'
     });
 }
 

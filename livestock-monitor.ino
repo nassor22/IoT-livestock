@@ -1,156 +1,174 @@
-// IoT Livestock Monitoring System
-// Arduino Uno with DHT11 + LM35 + two potentiometers (activity, heart rate)
+#include <WiFi.h>
+#include <HTTPClient.h>
 
-#include <DHT.h>
+// --- Hardware Pin Configurations ---
+const int DHT11_PIN  = 4;   // Connected to DHT Out
+const int PULSE_PIN  = 3;   // Connected to Pulse Sensor S (ADC1 Channel 3)
+const int GPS_RX_PIN = 13;  // Connected to Neo-6M TX
+const int GPS_TX_PIN = 12;  // Connected to Neo-6M RX
 
-// Pin definitions (match the provided wiring)
-#define DHTPIN 2          // DHT11 data pin
-#define DHTTYPE DHT11     // DHT sensor type
-#define LM35_PIN A0       // LM35 analog output (BT)
-#define ACTIVITY_PIN A1   // RV2 potentiometer (ACP)
-#define HRP_PIN A2        // RV1 potentiometer (HRP)
+// --- Local Server Configuration ---
+// Change this to match your computer's IP from running 'hostname -I'
+const char* serverUrl = "http://192.168.1.17:8000/api/livestock";
 
-// Alert thresholds
-#define BODY_TEMP_ALERT 39.5
-#define ACTIVITY_LOW_PCT 20
-#define HRP_LOW_BPM 15
-#define HRP_HIGH_BPM 85
-#define THI_STRESS_ALERT 72.0
-#define THI_NORMAL_MAX 72.0
-#define THI_MILD_MAX 78.0
+// --- Wi-Fi Credentials ---
+const char* ssid     = "The Lord of the PINGS";
+const char* password = "987667890";
 
-DHT dht(DHTPIN, DHTTYPE);
+// --- Global Telemetry Variables ---
+volatile int g_pulse_raw = 0;
+String g_gps_raw_string  = "No Fix";
+float g_temperature_c    = 24.0; // Default baseline value
 
-float readLm35C() {
-  int raw = analogRead(LM35_PIN);
-  float voltage = raw * (5.0 / 1023.0);
-  return voltage * 100.0; // LM35: 10mV per C
-}
+// Forward declaration of the FreeRTOS background task
+void pulseSensorTask(void *pvParameters);
 
-int readActivityPercent() {
-  int raw = analogRead(ACTIVITY_PIN);
-  
-  //Max analogRead value is 5, mapping it to 0-100% with a dead zone around the center
-  int percentRaw = (raw * 100) / 50;
-  return percentRaw;
-}
+// --- Simple Non-Blocking DHT11 Reader Function ---
+float readDHT11Temperature() {
+    uint8_t bits[5] = {0, 0, 0, 0, 0};
+    uint8_t cnt = 7;
+    uint8_t idx = 0;
 
-int readHeartRateBpm() {
-  int raw = analogRead(HRP_PIN);
-  
-  //Max analogRead value is 5, mapping it to 0-100 bpm with a dead zone around the center
-  int bpmRaw = (raw * 100) / 50;
-  return bpmRaw;
-}
+    // Send Handshake / Start Signal to DHT11
+    pinMode(DHT11_PIN, OUTPUT);
+    digitalWrite(DHT11_PIN, LOW);
+    delay(18); // Keep low for at least 18ms
+    digitalWrite(DHT11_PIN, HIGH);
+    delayMicroseconds(40);
+    pinMode(DHT11_PIN, INPUT);
 
-float calculateThi(float ambientC, float humidityPct) {
-  // THI for cattle: temp (C) + humidity-driven adjustment via Fahrenheit term
-  float tF = (1.8 * ambientC) + 32.0;
-  return tF - (0.55 - (0.0055 * humidityPct)) * (tF - 58.0);
-}
+    // Acknowledge pulse timing window from sensor
+    unsigned int loopCount = 10000;
+    while(digitalRead(DHT11_PIN) == LOW) if (loopCount-- == 0) return g_temperature_c;
+    loopCount = 10000;
+    while(digitalRead(DHT11_PIN) == HIGH) if (loopCount-- == 0) return g_temperature_c;
 
-float calculateTHI(float tempC, float humidity) {
-  return (1.8 * tempC + 32) -
-         ((0.55 - 0.0055 * humidity) * (1.8 * tempC - 26));
+    // Read the 40-bit data packet output stream
+    for (int i = 0; i < 40; i++) {
+        loopCount = 10000;
+        while(digitalRead(DHT11_PIN) == LOW) if (loopCount-- == 0) return g_temperature_c;
+        
+        unsigned long t = micros();
+        loopCount = 10000;
+        while(digitalRead(DHT11_PIN) == HIGH) if (loopCount-- == 0) return g_temperature_c;
+
+        if ((micros() - t) > 40) {
+            bits[idx] |= (1 << cnt);
+        }
+        if (cnt == 0) {   // next byte
+            cnt = 7;     
+            idx++;      
+        } else {
+            cnt--;
+        }
+    }
+
+    // Run simple checksum validation check
+    if ((bits[0] + bits[1] + bits[2] + bits[3]) == bits[4]) {
+        // bits[2] holds the integral temperature integer value for DHT11
+        return (float)bits[2];
+    }
+    
+    return g_temperature_c; // Return last known good temperature if checksum drops
 }
 
 void setup() {
-  Serial.begin(9600);
-  dht.begin();
-  Serial.println("Livestock Monitor");
-  Serial.println("Starting...");
-  Serial.println("Livestock monitor started");
+  // Initialize Serial Monitor for USB Diagnostics
+  Serial.begin(115200);
+  delay(1000);
+  Serial.println("\n--- Starting COW-001 Livestock Hardware Node ---");
+
+  // Initialize GPS on hardware serial bus (UART1) using pins 13 and 12
+  Serial1.begin(9600, SERIAL_8N1, GPS_RX_PIN, GPS_TX_PIN);
+
+  // Initialize Wi-Fi connection loop
+  Serial.print("Connecting to Wi-Fi Network: ");
+  Serial.println(ssid);
+  WiFi.begin(ssid, password);
+
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("\nWi-Fi Connected Successfully!");
+  Serial.print("ESP32-C6 Local Node IP: ");
+  Serial.println(WiFi.localIP());
+
+  // Spin up background target loop on Core 0 for real-time heartbeat polling
+  xTaskCreate(
+    pulseSensorTask,   
+    "PulseTask",       
+    3000,              
+    NULL,              
+    1,                 
+    NULL               
+  );
 }
 
 void loop() {
-  float humidity = dht.readHumidity();
-  float ambientTemp = dht.readTemperature();
-  float bodyTemp = readLm35C();
-  int activityPct = readActivityPercent();
-  int heartRate = readHeartRateBpm();
-
-  if (isnan(humidity) || isnan(ambientTemp)) {
-    Serial.println("Sensor Error: DHT11 read failed");
-    Serial.println("DHT11 error");
-    Serial.println("Check sensor");
-    delay(2000);
-    return;
+  // --- 1. Pull Incoming Serial Telemetry from Neo-6M GPS Module ---
+  if (Serial1.available() > 0) {
+    String gpsLine = Serial1.readStringUntil('\n');
+    if (gpsLine.startsWith("$GPRMC") || gpsLine.startsWith("$GPGGA")) {
+      g_gps_raw_string = gpsLine;
+      g_gps_raw_string.trim(); 
+      Serial.print("[GPS Live Stream] ");
+      Serial.println(g_gps_raw_string);
+    }
   }
 
-  Serial.print("BT:");
-  Serial.print(bodyTemp, 1);
-  Serial.print("C, AT:");
-  Serial.print(ambientTemp, 1);
-  Serial.print("C, H:");
-  Serial.print(humidity, 0);
-  Serial.print("%, ACT:");
-  Serial.print(activityPct);
-  Serial.print("%, HRP:");
-  Serial.print(heartRate);
-  Serial.println("bpm");
+  // --- 2. Check DHT11 Environmental Status (Every 10 Seconds) ---
+  static unsigned long lastDhtTime = 0;
+  if (millis() - lastDhtTime >= 10000) { 
+    lastDhtTime = millis();
+    float localTemp = readDHT11Temperature();
+    if (localTemp > 0) {
+        g_temperature_c = localTemp;
+    }
+    Serial.print("[DHT11 Internal Check] Calculated Core Temp: ");
+    Serial.concat(g_temperature_c);
+    Serial.println(" °C");
+  }
 
-  bool bodyAlert = bodyTemp > BODY_TEMP_ALERT;
-  bool activityLow = activityPct < ACTIVITY_LOW_PCT;
-  float thi = calculateThi(ambientTemp, humidity);
-  bool hrpAlert = (heartRate < HRP_LOW_BPM || heartRate > HRP_HIGH_BPM);
-  bool thiAlert = thi >= THI_STRESS_ALERT;
+  // --- 3. Package and Stream Payload to Local Node.js Server (Every 5 Seconds) ---
+  static unsigned long lastStreamTime = 0;
+  if (millis() - lastStreamTime >= 5000) { 
+    lastStreamTime = millis();
 
-  static bool showAlt = false;
-  char btStr[6];
-  char atStr[6];
-  char line1[32];
-  char line2[32];
-  int humidityPct = (int)(humidity + 0.5);
-
-  dtostrf(bodyTemp, 4, 1, btStr);
-  dtostrf(ambientTemp, 4, 1, atStr);
-
-  if (!showAlt) {
-    snprintf(line1, sizeof(line1), "BT:%sC AT:%s", btStr, atStr);
-    snprintf(line2, sizeof(line2), "H:%d%% THI:%d", humidityPct, (int)(thi + 0.5));
-  } else {
-    snprintf(line1, sizeof(line1), "HR:%dbpm ACT:%d", heartRate, activityPct);
-    if (thiAlert) {
-      snprintf(line2, sizeof(line2), "STRESS:HEAT");
+    if (WiFi.status() == WL_CONNECTED) {
+      HTTPClient http;
+      http.begin(serverUrl);
+      
+      // Setup payload content headers matching standard key=value URL formatting
+      http.addHeader("Content-Type", "application/x-www-form-urlencoded");
+      
+      String postData = "cowId=COW-001"
+                        "&bodyTemperature=" + String(g_temperature_c, 1) + 
+                        "&pulseRate=" + String(g_pulse_raw) + 
+                        "&gpsData=" + g_gps_raw_string;
+      
+      Serial.println("[HTTP Outbound] Shipping structured data package to local server...");
+      int httpResponseCode = http.POST(postData);
+      
+      if (httpResponseCode > 0) {
+        Serial.print("[HTTP Success] Server Response Status Token: ");
+        Serial.println(httpResponseCode);
+      } else {
+        Serial.print("[HTTP Warning] Connection dropped. Reason descriptor: ");
+        Serial.println(http.errorToString(httpResponseCode).c_str());
+      }
+      
+      http.end(); 
     } else {
-      snprintf(line2, sizeof(line2), "STRESS:NORMAL");
+      Serial.println("[Network Error] Outbound dropped: Wi-Fi link inactive.");
     }
   }
-  Serial.println(line1);
-  Serial.println(line2);
-  Serial.println("--");
-  showAlt = !showAlt;
+}
 
-  if (bodyAlert || activityLow || hrpAlert || thiAlert) {
-    Serial.print("ALERT: ");
-    if (bodyAlert) {
-      Serial.print("High body temp ");
-      Serial.print(bodyTemp, 1);
-      Serial.print("C ");
-    }
-    if (activityLow) {
-      Serial.print("Low activity ");
-      Serial.print(activityPct);
-      Serial.print("% ");
-    }
-    if (hrpAlert) {
-      Serial.print("Heart rate ");
-      Serial.print(heartRate);
-      Serial.print("bpm ");
-    }
-    if (thiAlert) {
-      Serial.print("THI ");
-      Serial.print(thi, 1);
-      Serial.print(" ");
-    }
-    Serial.println();
+// --- Independent Thread Stack Execution Worker for Pulse Sensor ---
+void pulseSensorTask(void *pvParameters) {
+  while (1) {
+    g_pulse_raw = analogRead(PULSE_PIN);
+    vTaskDelay(pdMS_TO_TICKS(200)); // Sleep loop state for 200 milliseconds to balance core resource load
   }
-
-  if (thiAlert) {
-    Serial.println("STRESS MSG: Heat stress likely. Provide shade/water.");
-  } else {
-    Serial.println("STRESS MSG: No heat stress detected.");
-  }
-
-  delay(2000);
 }
