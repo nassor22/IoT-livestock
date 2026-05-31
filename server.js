@@ -1,6 +1,7 @@
 const express = require('express');
 const mqtt = require('mqtt');
 const { Pool } = require('pg');
+const path = require('path');
 
 const app = express();
 const port = process.env.PORT || 8000;
@@ -204,6 +205,15 @@ app.get('/api/livestock/:animalId/readings', async (req, res) => {
     console.error('Error retrieving livestock history', err);
     res.status(500).json({ error: 'Error retrieving livestock history' });
   }
+});
+
+// Serve frontend static files and return index.html for non-API routes
+app.use(express.static(path.join(__dirname)));
+
+app.get('*', (req, res, next) => {
+  // Let API routes pass through
+  if (req.path.startsWith('/api') || req.path === '/data') return next();
+  res.sendFile(path.join(__dirname, 'index.html'));
 });
 
 
