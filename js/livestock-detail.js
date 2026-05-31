@@ -105,7 +105,7 @@ function initCharts(animalId, historyReadings = []) {
         ? orderedReadings.map(reading => reading.body_temp ?? reading.bodyTemperature ?? null).filter(value => value !== null)
         : (TEMPERATURE_HISTORY.datasets[animalId] || [38.5, 38.5, 38.6, 38.5, 38.4, 38.5, 38.5]);
 
-    if (window.tempChart) {
+    if (window.tempChart && typeof window.tempChart.destroy === 'function') {
         window.tempChart.destroy();
     }
     
@@ -165,7 +165,7 @@ function initCharts(animalId, historyReadings = []) {
         ? orderedReadings.map(reading => reading.pulse_rate ?? reading.heart_rate ?? reading.activity ?? null).filter(value => value !== null)
         : (ACTIVITY_HISTORY.datasets[animalId] || [65, 70, 75, 80, 75, 70, 65]);
 
-    if (window.activityChart) {
+    if (window.activityChart && typeof window.activityChart.destroy === 'function') {
         window.activityChart.destroy();
     }
     
