@@ -3,7 +3,7 @@
  * Handles rendering charts and statistics for ministry overview
  */
 
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function() {
     // Check authentication
     const user = checkAuth();
     if (!user) return;
@@ -15,12 +15,14 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // Initialize dashboard
-    initMinistryDashboard();
+    await initMinistryDashboard();
 });
 
-function initMinistryDashboard() {
+async function initMinistryDashboard() {
     updateCurrentDate();
-    initCharts();
+    await renderStats();
+    await renderRegionalSummary();
+    await initCharts();
     initSidebar();
 }
 
@@ -32,37 +34,83 @@ function updateCurrentDate() {
     dateElements.forEach(el => el.textContent = today);
 }
 
+async function renderStats() {
+    const stats = await getNationalStats();
+    const statValues = document.querySelectorAll('.ministry-stat-card .stat-value');
+    const statNotes = document.querySelectorAll('.ministry-stat-card .stat-change');
+
+    if (statValues[0]) statValues[0].textContent = stats.totalMonitored.toLocaleString();
+    if (statValues[1]) statValues[1].textContent = stats.healthyAnimals.toLocaleString();
+    if (statValues[2]) statValues[2].textContent = stats.activeAlerts.toLocaleString();
+    if (statValues[3]) statValues[3].textContent = stats.highRiskAreas.toString();
+
+    if (statNotes[0]) statNotes[0].textContent = 'Live total from sensor readings';
+    if (statNotes[1]) statNotes[1].textContent = 'Latest normal sensor status';
+    if (statNotes[2]) statNotes[2].textContent = 'Active sensor warnings and alerts';
+    if (statNotes[3]) statNotes[3].textContent = 'Animals currently in alert state';
+}
+
+async function renderRegionalSummary() {
+    const tbody = document.getElementById('regionalSummaryBody');
+    if (!tbody) {
+        return;
+    }
+
+    const regionalData = await getAllRegionalData();
+
+    if (!regionalData.length) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="6" class="empty-state-row">No regional sensor tags are available yet. Connect region metadata to populate this table.</td>
+            </tr>
+        `;
+        return;
+    }
+
+    tbody.innerHTML = regionalData.map(region => `
+        <tr>
+            <td>${region.name}</td>
+            <td>${region.monitored.toLocaleString()}</td>
+            <td>${region.healthy.toLocaleString()}</td>
+            <td>${region.alerts.toLocaleString()}</td>
+            <td><span class="risk-indicator ${region.riskLevel}"></span> ${region.riskLevel.charAt(0).toUpperCase() + region.riskLevel.slice(1)}</td>
+            <td>${region.trend}</td>
+        </tr>
+    `).join('');
+}
+
 // Initialize charts
-function initCharts() {
+async function initCharts() {
+    const trendData = await getDiseaseTrends();
+    const distData = await getAlertDistribution();
+
     // Trend Chart
     const trendCtx = document.getElementById('trendChart');
     if (trendCtx) {
-        const trendData = getDiseaseTrends();
-        
         new Chart(trendCtx, {
             type: 'line',
             data: {
                 labels: trendData.labels,
                 datasets: [
                     {
-                        label: 'High Fever',
-                        data: trendData.datasets.fever,
+                        label: 'Body Temperature',
+                        data: trendData.datasets.bodyTemp,
                         borderColor: '#F44336',
                         backgroundColor: 'rgba(244, 67, 54, 0.1)',
                         fill: true,
                         tension: 0.4
                     },
                     {
-                        label: 'Respiratory',
-                        data: trendData.datasets.respiratory,
+                        label: 'Pulse Rate',
+                        data: trendData.datasets.pulseRate,
                         borderColor: '#FF9800',
                         backgroundColor: 'rgba(255, 152, 0, 0.1)',
                         fill: true,
                         tension: 0.4
                     },
                     {
-                        label: 'Digestive',
-                        data: trendData.datasets.digestive,
+                        label: 'Alert Count',
+                        data: trendData.datasets.alerts,
                         borderColor: '#2196F3',
                         backgroundColor: 'rgba(33, 150, 243, 0.1)',
                         fill: true,
@@ -94,8 +142,6 @@ function initCharts() {
     // Alert Distribution Chart
     const distCtx = document.getElementById('alertDistChart');
     if (distCtx) {
-        const distData = getAlertDistribution();
-        
         new Chart(distCtx, {
             type: 'doughnut',
             data: {
@@ -154,10 +200,10 @@ function toggleSidebar() {
 // Generate report
 function generateReport(type) {
     let reportType = type || 'summary';
-    alert(`Generating ${reportType} report...\n\nReport will be downloaded as PDF with aggregated and anonymized data.`);
+    alert(`Generating ${reportType} report...\n\nReport will be downloaded from live sensor aggregates.`);
 }
 
 // Export data
 function exportData() {
-    alert('Exporting aggregated data as CSV...\n\nThis export contains only anonymized regional statistics, no individual farmer data.');
+    alert('Exporting live sensor aggregates as CSV...\n\nThis export contains no mocked data.');
 }

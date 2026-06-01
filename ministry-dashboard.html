@@ -111,11 +111,8 @@
                         </div>
                         <div class="stat-info">
                             <div class="stat-title">Total Monitored</div>
-                            <div class="stat-value">24,856</div>
-                            <div class="stat-change positive">
-                                <i class="fas fa-arrow-up"></i>
-                                +12.5% from last month
-                            </div>
+                            <div class="stat-value">--</div>
+                            <div class="stat-change">Live sensor total</div>
                         </div>
                     </div>
                     
@@ -125,11 +122,8 @@
                         </div>
                         <div class="stat-info">
                             <div class="stat-title">Healthy Animals</div>
-                            <div class="stat-value">23,142</div>
-                            <div class="stat-change positive">
-                                <i class="fas fa-arrow-up"></i>
-                                93.1% of total
-                            </div>
+                            <div class="stat-value">--</div>
+                            <div class="stat-change">Latest normal sensor status</div>
                         </div>
                     </div>
                     
@@ -139,11 +133,8 @@
                         </div>
                         <div class="stat-info">
                             <div class="stat-title">Active Alerts</div>
-                            <div class="stat-value">1,428</div>
-                            <div class="stat-change negative">
-                                <i class="fas fa-arrow-up"></i>
-                                +3.2% from last week
-                            </div>
+                            <div class="stat-value">--</div>
+                            <div class="stat-change">Active sensor warnings</div>
                         </div>
                     </div>
                     
@@ -153,11 +144,8 @@
                         </div>
                         <div class="stat-info">
                             <div class="stat-title">High Risk Areas</div>
-                            <div class="stat-value">8</div>
-                            <div class="stat-change negative">
-                                <i class="fas fa-arrow-up"></i>
-                                +2 from last week
-                            </div>
+                            <div class="stat-value">--</div>
+                            <div class="stat-change">Waiting for regional tags</div>
                         </div>
                     </div>
                 </div>
@@ -215,41 +203,9 @@
                                 <th>Trend</th>
                             </tr>
                         </thead>
-                        <tbody>
+                        <tbody id="regionalSummaryBody">
                             <tr>
-                                <td><span class="region-badge"><i class="fas fa-map-marker-alt"></i> Dar es Salaam</span></td>
-                                <td>8,245</td>
-                                <td>423</td>
-                                <td><span class="risk-indicator medium"></span> Medium</td>
-                                <td class="stat-change negative"><i class="fas fa-arrow-up"></i> +2.3%</td>
-                            </tr>
-                            <tr>
-                                <td><span class="region-badge"><i class="fas fa-map-marker-alt"></i> Arusha</span></td>
-                                <td>6,892</td>
-                                <td>312</td>
-                                <td><span class="risk-indicator low"></span> Low</td>
-                                <td class="stat-change positive"><i class="fas fa-arrow-down"></i> -1.8%</td>
-                            </tr>
-                            <tr>
-                                <td><span class="region-badge"><i class="fas fa-map-marker-alt"></i> Mbeya</span></td>
-                                <td>4,521</td>
-                                <td>389</td>
-                                <td><span class="risk-indicator high"></span> High</td>
-                                <td class="stat-change negative"><i class="fas fa-arrow-up"></i> +5.1%</td>
-                            </tr>
-                            <tr>
-                                <td><span class="region-badge"><i class="fas fa-map-marker-alt"></i> Dodoma</span></td>
-                                <td>2,876</td>
-                                <td>156</td>
-                                <td><span class="risk-indicator low"></span> Low</td>
-                                <td class="stat-change positive"><i class="fas fa-arrow-down"></i> -0.5%</td>
-                            </tr>
-                            <tr>
-                                <td><span class="region-badge"><i class="fas fa-map-marker-alt"></i> Kilimanjaro</span></td>
-                                <td>2,322</td>
-                                <td>148</td>
-                                <td><span class="risk-indicator medium"></span> Medium</td>
-                                <td class="stat-change positive"><i class="fas fa-arrow-down"></i> -1.2%</td>
+                                <td colspan="5" class="empty-state-row">No regional sensor metadata is available yet.</td>
                             </tr>
                         </tbody>
                     </table>

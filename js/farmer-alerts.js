@@ -2,7 +2,7 @@
  * Farmer Alerts Page Module
  */
 
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function() {
     // Check authentication
     const user = checkAuth();
     if (!user) return;
@@ -16,7 +16,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Initialize page
     initFilters();
     initSearch();
-    renderAlerts('all', '');
+    await renderAlerts('all', '');
 });
 
 let activeFilter = 'all';
@@ -39,9 +39,9 @@ function initFilters() {
 }
 
 // Render alerts list
-function renderAlerts(filter, query) {
+async function renderAlerts(filter, query) {
     const container = document.getElementById('allAlertsList');
-    const alerts = filter === 'all' ? ALERTS_DATA : getAlertsByFilter(filter);
+    const alerts = await getAlertsByFilter(filter);
     const normalizedQuery = query.trim().toLowerCase();
     const filteredAlerts = alerts.filter(alert => {
         if (!normalizedQuery) return true;
@@ -54,7 +54,7 @@ function renderAlerts(filter, query) {
         container.innerHTML = `
             <div class="empty-state">
                 <i class="fas fa-search"></i>
-                <p>No alerts match your filter</p>
+                <p>No live alerts match your filter</p>
             </div>
         `;
         return;

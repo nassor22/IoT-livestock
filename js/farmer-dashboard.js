@@ -3,7 +3,7 @@
  * Handles rendering and interactivity for the farmer dashboard
  */
 
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function() {
     // Check authentication
     const user = checkAuth();
     if (!user) return;
@@ -18,22 +18,24 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('farmerName').textContent = user.name.split(' ')[0];
     
     // Initialize dashboard
-    initDashboard();
+    await initDashboard();
     initFilters();
     initOfflineDetection();
 });
 
 // Initialize dashboard data
-function initDashboard() {
-    renderStats();
-    renderLivestockList('all');
-    renderAlerts();
-    renderRecommendations();
+async function initDashboard() {
+    await Promise.all([
+        renderStats(),
+        renderLivestockList('all'),
+        renderAlerts(),
+        renderRecommendations()
+    ]);
 }
 
 // Render statistics
-function renderStats() {
-    const stats = getLivestockStats();
+async function renderStats() {
+    const stats = await getLivestockStats();
     document.getElementById('totalAnimals').textContent = stats.total;
     document.getElementById('warningCount').textContent = stats.warning;
     document.getElementById('alertCount').textContent = stats.alert;
@@ -41,17 +43,28 @@ function renderStats() {
     // Update notification badge
     const notificationCount = document.getElementById('notificationCount');
     if (notificationCount) {
-        notificationCount.textContent = ALERTS_DATA.length;
+        const alerts = await getAlertsByFilter('all');
+        notificationCount.textContent = alerts.length;
     }
 }
 
 // Render livestock list
-function renderLivestockList(filter) {
+async function renderLivestockList(filter) {
     const container = document.getElementById('livestockList');
-    const livestock = getLivestockByFilter(filter);
+    const livestock = await getLivestockByFilter(filter);
     
     // Show only first 5 on dashboard
     const displayLivestock = livestock.slice(0, 5);
+
+    if (!displayLivestock.length) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <i class="fas fa-wave-square"></i>
+                <p>No live livestock sensor data is available yet.</p>
+            </div>
+        `;
+        return;
+    }
     
     container.innerHTML = displayLivestock.map(animal => `
         <div class="livestock-item" onclick="viewLivestockDetail('${animal.id}')">
@@ -76,9 +89,19 @@ function renderLivestockList(filter) {
 }
 
 // Render alerts
-function renderAlerts() {
+async function renderAlerts() {
     const container = document.getElementById('alertList');
-    const alerts = ALERTS_DATA.slice(0, 3);
+    const alerts = (await getAlertsByFilter('all')).slice(0, 3);
+
+    if (!alerts.length) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <i class="fas fa-bell-slash"></i>
+                <p>No live alerts from sensors right now.</p>
+            </div>
+        `;
+        return;
+    }
     
     container.innerHTML = alerts.map(alert => `
         <div class="alert-card ${alert.type}">
@@ -103,10 +126,27 @@ function renderAlerts() {
 }
 
 // Render recommendations
-function renderRecommendations() {
+async function renderRecommendations() {
     const container = document.getElementById('recommendationsList');
+    const alerts = await getAlertsByFilter('all');
+    const liveRecommendations = alerts.slice(0, 3).map(alert => ({
+        icon: alert.type === 'alert' ? 'fa-temperature-high' : 'fa-exclamation-triangle',
+        iconClass: alert.type === 'alert' ? 'urgent' : 'warning',
+        action: `Review ${alert.animalId}`,
+        detail: alert.description
+    }));
     
-    container.innerHTML = RECOMMENDATIONS_DATA.map(rec => `
+    if (!liveRecommendations.length) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <i class="fas fa-clipboard-list"></i>
+                <p>No recommendations until a sensor crosses a threshold.</p>
+            </div>
+        `;
+        return;
+    }
+
+    container.innerHTML = liveRecommendations.map(rec => `
         <div class="recommendation-card">
             <div class="recommendation-icon ${rec.iconClass}">
                 <i class="fas ${rec.icon}"></i>
@@ -143,8 +183,14 @@ function viewLivestockDetail(id) {
 }
 
 // Show notifications
-function showNotifications() {
-    alert('Notifications:\n\n' + ALERTS_DATA.map(a => `• ${a.title}`).join('\n'));
+async function showNotifications() {
+    const alerts = await getAlertsByFilter('all');
+    if (!alerts.length) {
+        alert('Notifications:\n\nNo live alerts available from sensors yet.');
+        return;
+    }
+
+    alert('Notifications:\n\n' + alerts.map(a => `• ${a.title}`).join('\n'));
 }
 
 // Offline detection

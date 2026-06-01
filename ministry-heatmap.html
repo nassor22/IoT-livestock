@@ -28,26 +28,13 @@
 				cursor: pointer;
 				transition: all var(--transition-fast);
 				box-shadow: var(--shadow-sm);
+				background-color: rgba(255, 255, 255, 0.92);
+				color: #1f2933;
 			}
 
 			.map-region:hover {
 				transform: scale(1.1);
 				z-index: 10;
-			}
-
-			.map-region.high {
-				background-color: rgba(244, 67, 54, 0.85);
-				color: white;
-			}
-
-			.map-region.medium {
-				background-color: rgba(255, 193, 7, 0.85);
-				color: #333;
-			}
-
-			.map-region.low {
-				background-color: rgba(76, 175, 80, 0.85);
-				color: white;
 			}
 
 			/* Positioned regions on the map */
@@ -246,52 +233,32 @@
 
 						<!-- Interactive Map -->
 						<div class="map-container">
-							<div class="map-region medium region-dar" data-region="dar">
-								Dar es Salaam
-							</div>
-							<div class="map-region low region-arusha" data-region="arusha">
-								Arusha
-							</div>
-							<div class="map-region high region-mbeya" data-region="mbeya">
-								Mbeya
-							</div>
-							<div class="map-region low region-dodoma" data-region="dodoma">
-								Dodoma
-							</div>
-							<div
-								class="map-region medium region-kilimanjaro"
-								data-region="kilimanjaro"
-							>
-								Kilimanjaro
-							</div>
-							<div class="map-region low region-iringa" data-region="iringa">
-								Iringa
-							</div>
-							<div class="map-region high region-mwanza" data-region="mwanza">
-								Mwanza
-							</div>
-							<div class="map-region medium region-tanga" data-region="tanga">
-								Tanga
-							</div>
+							<div class="map-region region-dar" data-region="dar">Dar es Salaam</div>
+							<div class="map-region region-arusha" data-region="arusha">Arusha</div>
+							<div class="map-region region-mbeya" data-region="mbeya">Mbeya</div>
+							<div class="map-region region-dodoma" data-region="dodoma">Dodoma</div>
+							<div class="map-region region-kilimanjaro" data-region="kilimanjaro">Kilimanjaro</div>
+							<div class="map-region region-iringa" data-region="iringa">Iringa</div>
+							<div class="map-region region-mwanza" data-region="mwanza">Mwanza</div>
+							<div class="map-region region-tanga" data-region="tanga">Tanga</div>
 
-							<!-- Tooltip -->
 							<div class="map-tooltip" id="mapTooltip">
-								<div class="tooltip-title" id="tooltipTitle">Region Name</div>
+								<div class="tooltip-title" id="tooltipTitle">No live regional data</div>
 								<div class="tooltip-row">
 									<span class="tooltip-label">Monitored Animals:</span>
-									<span id="tooltipAnimals">0</span>
+									<span id="tooltipAnimals">--</span>
 								</div>
 								<div class="tooltip-row">
-									<span class="tooltip-label">Active Alerts:</span>
-									<span id="tooltipAlerts">0</span>
+									<span class="tooltip-label">Alerts:</span>
+									<span id="tooltipAlerts">--</span>
 								</div>
 								<div class="tooltip-row">
 									<span class="tooltip-label">Risk Level:</span>
-									<span id="tooltipRisk">Low</span>
+									<span id="tooltipRisk">Unavailable</span>
 								</div>
 								<div class="tooltip-row">
 									<span class="tooltip-label">Trend:</span>
-									<span id="tooltipTrend">Stable</span>
+									<span id="tooltipTrend">No live regional data</span>
 								</div>
 							</div>
 						</div>
@@ -336,100 +303,7 @@
 							</thead>
 							<tbody>
 								<tr>
-									<td>
-										<span class="region-badge"
-											><i class="fas fa-map-marker-alt"></i> Mbeya</span
-										>
-									</td>
-									<td>4,521</td>
-									<td>389</td>
-									<td>8.6%</td>
-									<td>Lumpy Skin Disease</td>
-									<td><span class="risk-indicator high"></span> High</td>
-								</tr>
-								<tr>
-									<td>
-										<span class="region-badge"
-											><i class="fas fa-map-marker-alt"></i> Mwanza</span
-										>
-									</td>
-									<td>1,234</td>
-									<td>112</td>
-									<td>9.1%</td>
-									<td>Foot and Mouth</td>
-									<td><span class="risk-indicator high"></span> High</td>
-								</tr>
-								<tr>
-									<td>
-										<span class="region-badge"
-											><i class="fas fa-map-marker-alt"></i> Dar es Salaam</span
-										>
-									</td>
-									<td>8,245</td>
-									<td>423</td>
-									<td>5.1%</td>
-									<td>Multiple</td>
-									<td><span class="risk-indicator medium"></span> Medium</td>
-								</tr>
-								<tr>
-									<td>
-										<span class="region-badge"
-											><i class="fas fa-map-marker-alt"></i> Kilimanjaro</span
-										>
-									</td>
-									<td>2,322</td>
-									<td>148</td>
-									<td>6.4%</td>
-									<td>Anthrax</td>
-									<td><span class="risk-indicator medium"></span> Medium</td>
-								</tr>
-								<tr>
-									<td>
-										<span class="region-badge"
-											><i class="fas fa-map-marker-alt"></i> Tanga</span
-										>
-									</td>
-									<td>987</td>
-									<td>52</td>
-									<td>5.3%</td>
-									<td>Bovine TB</td>
-									<td><span class="risk-indicator medium"></span> Medium</td>
-								</tr>
-								<tr>
-									<td>
-										<span class="region-badge"
-											><i class="fas fa-map-marker-alt"></i> Arusha</span
-										>
-									</td>
-									<td>6,892</td>
-									<td>312</td>
-									<td>4.5%</td>
-									<td>Minor Issues</td>
-									<td><span class="risk-indicator low"></span> Low</td>
-								</tr>
-								<tr>
-									<td>
-										<span class="region-badge"
-											><i class="fas fa-map-marker-alt"></i> Dodoma</span
-										>
-									</td>
-									<td>2,876</td>
-									<td>156</td>
-									<td>5.4%</td>
-									<td>Minor Issues</td>
-									<td><span class="risk-indicator low"></span> Low</td>
-								</tr>
-								<tr>
-									<td>
-										<span class="region-badge"
-											><i class="fas fa-map-marker-alt"></i> Iringa</span
-										>
-									</td>
-									<td>1,456</td>
-									<td>67</td>
-									<td>4.6%</td>
-									<td>Minor Issues</td>
-									<td><span class="risk-indicator low"></span> Low</td>
+									<td colspan="6" class="empty-state-row">No live regional sensor rankings are available yet.</td>
 								</tr>
 							</tbody>
 						</table>

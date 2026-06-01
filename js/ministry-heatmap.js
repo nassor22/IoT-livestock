@@ -30,20 +30,16 @@ function initHeatMap() {
             const regionId = this.dataset.region;
             const data = getRegionalData(regionId);
             
-            if (data) {
-                // Update tooltip content
-                document.getElementById('tooltipTitle').textContent = data.name;
-                document.getElementById('tooltipAnimals').textContent = data.monitored.toLocaleString();
-                document.getElementById('tooltipAlerts').textContent = data.alerts;
-                document.getElementById('tooltipRisk').textContent = data.riskLevel.charAt(0).toUpperCase() + data.riskLevel.slice(1);
-                document.getElementById('tooltipTrend').textContent = data.trend;
-                
-                // Position and show tooltip
-                const rect = this.getBoundingClientRect();
-                tooltip.style.left = (rect.left + rect.width / 2 - 100) + 'px';
-                tooltip.style.top = (rect.top - 150) + 'px';
-                tooltip.classList.add('show');
-            }
+            document.getElementById('tooltipTitle').textContent = data ? data.name : this.textContent.trim();
+            document.getElementById('tooltipAnimals').textContent = data ? data.monitored.toLocaleString() : '--';
+            document.getElementById('tooltipAlerts').textContent = data ? data.alerts : '--';
+            document.getElementById('tooltipRisk').textContent = data ? data.riskLevel.charAt(0).toUpperCase() + data.riskLevel.slice(1) : 'Unavailable';
+            document.getElementById('tooltipTrend').textContent = data ? data.trend : 'No live regional data';
+
+            const rect = this.getBoundingClientRect();
+            tooltip.style.left = (rect.left + rect.width / 2 - 100) + 'px';
+            tooltip.style.top = (rect.top - 150) + 'px';
+            tooltip.classList.add('show');
         });
         
         region.addEventListener('mouseleave', function() {
@@ -60,6 +56,8 @@ function initHeatMap() {
                     `Active Alerts: ${data.alerts}\n` +
                     `Risk Level: ${data.riskLevel}\n` +
                     `Trend: ${data.trend}`);
+            } else {
+                alert('No live regional sensor data is available yet for this map view.');
             }
         });
     });
@@ -100,5 +98,5 @@ function toggleSidebar() {
 
 // Export heat map
 function exportHeatMap() {
-    alert('Exporting heat map as PDF...\n\nThis visualization shows aggregated risk levels without individual farm locations.');
+    alert('Exporting heat map as PDF...\n\nThis view is currently awaiting live regional sensor tags.');
 }

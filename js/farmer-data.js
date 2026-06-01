@@ -1,283 +1,211 @@
 /**
  * Farmer Data Module
- * Mock data for farmer dashboard
+ * Live sensor-backed helper functions for farmer pages
  */
 
-const LIVESTOCK_DATA = [
-    {
-        id: 'COW-001',
-        type: 'Dairy Cow',
-        age: '3 years',
-        icon: 'fa-cow',
-        status: 'warning',
-        statusText: 'Warning',
-        temperature: 39.8,
-        activity: 'Low',
-        rumination: 'Normal',
-        lastUpdate: '5 min ago'
-    },
-    {
-        id: 'COW-002',
-        type: 'Dairy Cow',
-        age: '4 years',
-        icon: 'fa-cow',
-        status: 'normal',
-        statusText: 'Normal',
-        temperature: 38.5,
-        activity: 'Normal',
-        rumination: 'Normal',
-        lastUpdate: '3 min ago'
-    },
-    {
-        id: 'COW-003',
-        type: 'Beef Cattle',
-        age: '2 years',
-        icon: 'fa-cow',
-        status: 'alert',
-        statusText: 'Alert',
-        temperature: 40.5,
-        activity: 'Very Low',
-        rumination: 'Reduced',
-        lastUpdate: '1 min ago'
-    },
-    {
-        id: 'COW-004',
-        type: 'Dairy Cow',
-        age: '5 years',
-        icon: 'fa-cow',
-        status: 'normal',
-        statusText: 'Normal',
-        temperature: 38.3,
-        activity: 'Normal',
-        rumination: 'Normal',
-        lastUpdate: '7 min ago'
-    },
-    {
-        id: 'GOAT-001',
-        type: 'Dairy Goat',
-        age: '2 years',
-        icon: 'fa-deer',
-        status: 'normal',
-        statusText: 'Normal',
-        temperature: 39.0,
-        activity: 'High',
-        rumination: 'Normal',
-        lastUpdate: '4 min ago'
-    },
-    {
-        id: 'GOAT-002',
-        type: 'Boer Goat',
-        age: '1 year',
-        icon: 'fa-deer',
-        status: 'warning',
-        statusText: 'Warning',
-        temperature: 39.6,
-        activity: 'Low',
-        rumination: 'Reduced',
-        lastUpdate: '8 min ago'
-    },
-    {
-        id: 'SHEEP-001',
-        type: 'Dorper Sheep',
-        age: '3 years',
-        icon: 'fa-sheep',
-        status: 'normal',
-        statusText: 'Normal',
-        temperature: 39.2,
-        activity: 'Normal',
-        rumination: 'Normal',
-        lastUpdate: '2 min ago'
-    },
-    {
-        id: 'SHEEP-002',
-        type: 'Merino Sheep',
-        age: '2 years',
-        icon: 'fa-sheep',
-        status: 'normal',
-        statusText: 'Normal',
-        temperature: 38.9,
-        activity: 'Normal',
-        rumination: 'Normal',
-        lastUpdate: '6 min ago'
-    },
-    {
-        id: 'COW-005',
-        type: 'Dairy Cow',
-        age: '6 years',
-        icon: 'fa-cow',
-        status: 'normal',
-        statusText: 'Normal',
-        temperature: 38.4,
-        activity: 'Normal',
-        rumination: 'Normal',
-        lastUpdate: '10 min ago'
-    },
-    {
-        id: 'COW-006',
-        type: 'Beef Cattle',
-        age: '3 years',
-        icon: 'fa-cow',
-        status: 'normal',
-        statusText: 'Normal',
-        temperature: 38.6,
-        activity: 'High',
-        rumination: 'Normal',
-        lastUpdate: '5 min ago'
-    },
-    {
-        id: 'GOAT-003',
-        type: 'Alpine Goat',
-        age: '4 years',
-        icon: 'fa-deer',
-        status: 'normal',
-        statusText: 'Normal',
-        temperature: 38.8,
-        activity: 'Normal',
-        rumination: 'Normal',
-        lastUpdate: '12 min ago'
-    },
-    {
-        id: 'GOAT-004',
-        type: 'Dairy Goat',
-        age: '2 years',
-        icon: 'fa-deer',
-        status: 'normal',
-        statusText: 'Normal',
-        temperature: 39.1,
-        activity: 'Normal',
-        rumination: 'Normal',
-        lastUpdate: '9 min ago'
-    }
-];
+const SENSOR_API_BASE = 'http://localhost:8000';
 
-const ALERTS_DATA = [
-    {
-        id: 0,
-        type: 'alert',
-        icon: 'fa-temperature-high',
-        title: 'Heat Stress Detected',
-        description: 'COW-002 shows heat stress indicators: 41.1°C and rapid breathing from simulation feed',
-        time: '5 minutes ago',
-        animalId: 'COW-002',
-        smsSent: true
-    },
-    {
-        id: 1,
-        type: 'alert',
-        icon: 'fa-exclamation-circle',
-        title: 'High body temp',
-        description: 'COW-003 body temp 40.5C',
-        time: '15 minutes ago',
-        animalId: 'COW-003',
-        smsSent: true
-    },
-    {
-        id: 2,
-        type: 'warning',
-        icon: 'fa-exclamation-triangle',
-        title: 'Low activity',
-        description: 'COW-001 activity 15%',
-        time: '2 hours ago',
-        animalId: 'COW-001',
-        smsSent: true
-    },
-    {
-        id: 3,
-        type: 'warning',
-        icon: 'fa-exclamation-triangle',
-        title: 'Heart rate',
-        description: 'COW-002 heart rate 90bpm',
-        time: '3 hours ago',
-        animalId: 'COW-002',
+async function fetchSensorReadings(animalId = null, limit = 500) {
+    const url = animalId
+        ? `${SENSOR_API_BASE}/api/livestock/${encodeURIComponent(animalId)}/readings?limit=${limit}`
+        : `${SENSOR_API_BASE}/data?limit=${limit}`;
+
+    try {
+        const response = await fetch(url);
+        if (!response.ok) {
+            return [];
+        }
+
+        const payload = await response.json();
+        return Array.isArray(payload) ? payload : [];
+    } catch (error) {
+        console.warn('Unable to load live sensor readings.', error);
+        return [];
+    }
+}
+
+function resolveAnimalId(reading) {
+    return reading.animal_id || reading.animalId || reading.cowId || reading.id || 'UNKNOWN';
+}
+
+function getNumericValue(value) {
+    if (value === undefined || value === null || value === '') {
+        return null;
+    }
+
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+}
+
+function getTemperatureClass(temperature) {
+    if (temperature == null) return 'status-value';
+    if (temperature > 39.5) return 'status-value high';
+    if (temperature < 38) return 'status-value low';
+    return 'status-value normal';
+}
+
+function getPulseClass(pulseRate) {
+    if (pulseRate == null) return 'status-value';
+    if (pulseRate > 100) return 'status-value high';
+    if (pulseRate < 50) return 'status-value low';
+    return 'status-value normal';
+}
+
+function getReadingStatus(bodyTemp, pulseRate, thi) {
+    if ((bodyTemp != null && bodyTemp > 39.8) || (pulseRate != null && pulseRate > 110) || (thi != null && thi >= 72)) {
+        return 'alert';
+    }
+
+    if ((bodyTemp != null && bodyTemp > 39.2) || (pulseRate != null && (pulseRate < 50 || pulseRate > 100))) {
+        return 'warning';
+    }
+
+    return 'normal';
+}
+
+function toReadableStatus(status) {
+    if (status === 'alert') return 'Alert';
+    if (status === 'warning') return 'Warning';
+    return 'Normal';
+}
+
+function formatRelativeTime(timestamp) {
+    if (!timestamp) {
+        return 'Just now';
+    }
+
+    const date = new Date(timestamp);
+    if (Number.isNaN(date.getTime())) {
+        return 'Just now';
+    }
+
+    const diffMinutes = Math.max(0, Math.round((Date.now() - date.getTime()) / 60000));
+    if (diffMinutes < 1) return 'Just now';
+    if (diffMinutes < 60) return `${diffMinutes} min ago`;
+
+    const diffHours = Math.round(diffMinutes / 60);
+    if (diffHours < 24) return `${diffHours} hr ago`;
+
+    const diffDays = Math.round(diffHours / 24);
+    return `${diffDays} day${diffDays === 1 ? '' : 's'} ago`;
+}
+
+function buildLivestockRecord(reading) {
+    const bodyTemp = getNumericValue(reading.body_temp ?? reading.bodyTemperature);
+    const pulseRate = getNumericValue(reading.pulse_rate ?? reading.heart_rate ?? reading.activity);
+    const thi = getNumericValue(reading.thi);
+    const status = getReadingStatus(bodyTemp, pulseRate, thi);
+    const timestamp = reading.timestamp ? new Date(reading.timestamp) : null;
+
+    return {
+        id: resolveAnimalId(reading),
+        type: 'Sensor Node',
+        age: 'Unknown',
+        icon: 'fa-cow',
+        status,
+        statusText: toReadableStatus(status),
+        temperature: bodyTemp,
+        pulseRate,
+        ambientTemp: getNumericValue(reading.ambient_temp),
+        humidity: getNumericValue(reading.humidity),
+        thi,
+        gpsData: reading.gps_data ?? reading.gpsData ?? null,
+        activity: pulseRate == null ? 'Unknown' : `${Math.round(pulseRate)} bpm`,
+        rumination: 'Unknown',
+        lastUpdate: timestamp && !Number.isNaN(timestamp.getTime()) ? timestamp.toLocaleString() : formatRelativeTime(reading.timestamp),
+        latestReading: reading
+    };
+}
+
+function buildAlertRecord(reading) {
+    const record = buildLivestockRecord(reading);
+    if (record.status === 'normal') {
+        return null;
+    }
+
+    const title = record.status === 'alert' ? 'Sensor Alert' : 'Sensor Warning';
+    const detailParts = [];
+
+    if (record.temperature != null) {
+        detailParts.push(`Body temp ${record.temperature.toFixed(1)}°C`);
+    }
+    if (record.pulseRate != null) {
+        detailParts.push(`Pulse ${Math.round(record.pulseRate)} bpm`);
+    }
+    if (record.thi != null) {
+        detailParts.push(`THI ${record.thi.toFixed(1)}`);
+    }
+
+    return {
+        id: `${record.id}-${record.lastUpdate}`,
+        type: record.status,
+        icon: record.status === 'alert' ? 'fa-temperature-high' : 'fa-exclamation-triangle',
+        title: `${title} - ${record.id}`,
+        description: detailParts.length > 0 ? detailParts.join(' · ') : `Latest reading for ${record.id} requires attention`,
+        time: record.lastUpdate,
+        animalId: record.id,
         smsSent: false
-    },
-    {
-        id: 4,
-        type: 'warning',
-        icon: 'fa-exclamation-triangle',
-        title: 'THI',
-        description: 'COW-004 THI 78',
-        time: '4 hours ago',
-        animalId: 'COW-004',
-        smsSent: false
-    },
-    {
-        id: 4,
-        type: 'resolved',
-        icon: 'fa-check-circle',
-        title: 'Temperature Normalized',
-        description: 'COW-007 temperature returned to normal range',
-        time: 'Yesterday',
-        animalId: 'COW-007',
-        smsSent: true
-    }
-];
+    };
+}
 
-const RECOMMENDATIONS_DATA = [
-    {
-        id: 1,
-        icon: 'fa-eye',
-        iconClass: 'urgent',
-        action: 'Check COW-003 immediately',
-        detail: 'High temperature detected - may indicate infection'
-    },
-    {
-        id: 2,
-        icon: 'fa-shield-alt',
-        iconClass: 'warning',
-        action: 'Consider isolating COW-001',
-        detail: 'Low activity may indicate illness - prevent spread'
-    },
-    {
-        id: 3,
-        icon: 'fa-phone',
-        iconClass: '',
-        action: 'Contact veterinary officer',
-        detail: 'Multiple animals showing warning signs'
-    }
-];
+function sortByLatestTimestamp(readings) {
+    return [...readings].sort((left, right) => {
+        const leftTime = new Date(left.timestamp || 0).getTime();
+        const rightTime = new Date(right.timestamp || 0).getTime();
+        return rightTime - leftTime;
+    });
+}
 
-// Temperature history data for charts (24 hours)
-const TEMPERATURE_HISTORY = {
-    labels: ['00:00', '04:00', '08:00', '12:00', '16:00', '20:00', 'Now'],
-    datasets: {
-        'COW-001': [38.4, 38.5, 38.7, 39.2, 39.5, 39.7, 39.8],
-        'COW-003': [38.6, 38.9, 39.5, 40.0, 40.3, 40.4, 40.5]
-    }
-};
+function collapseLatestReadings(readings) {
+    const latestByAnimal = new Map();
 
-// Activity history data for charts
-const ACTIVITY_HISTORY = {
-    labels: ['00:00', '04:00', '08:00', '12:00', '16:00', '20:00', 'Now'],
-    datasets: {
-        'COW-001': [60, 45, 35, 30, 25, 20, 15],
-        'COW-003': [70, 55, 40, 30, 20, 15, 10]
+    for (const reading of sortByLatestTimestamp(readings)) {
+        const animalId = resolveAnimalId(reading);
+        if (!latestByAnimal.has(animalId)) {
+            latestByAnimal.set(animalId, reading);
+        }
     }
-};
 
-// Get livestock stats
-function getLivestockStats() {
-    const total = LIVESTOCK_DATA.length;
-    const normal = LIVESTOCK_DATA.filter(a => a.status === 'normal').length;
-    const warning = LIVESTOCK_DATA.filter(a => a.status === 'warning').length;
-    const alert = LIVESTOCK_DATA.filter(a => a.status === 'alert').length;
-    
+    return Array.from(latestByAnimal.values()).map(buildLivestockRecord);
+}
+
+async function getLivestockStats() {
+    const livestock = await getLiveLivestock('all');
+    const total = livestock.length;
+    const normal = livestock.filter(animal => animal.status === 'normal').length;
+    const warning = livestock.filter(animal => animal.status === 'warning').length;
+    const alert = livestock.filter(animal => animal.status === 'alert').length;
+
     return { total, normal, warning, alert };
 }
 
-// Get livestock by filter
-function getLivestockByFilter(filter) {
-    if (filter === 'all') return LIVESTOCK_DATA;
-    return LIVESTOCK_DATA.filter(a => a.status === filter);
+async function getLiveLivestock(filter = 'all') {
+    const readings = await fetchSensorReadings(null, 500);
+    const livestock = collapseLatestReadings(readings);
+
+    if (filter === 'all') {
+        return livestock;
+    }
+
+    return livestock.filter(animal => animal.status === filter);
 }
 
-// Get livestock by ID
-function getLivestockById(id) {
-    return LIVESTOCK_DATA.find(a => a.id === id);
+async function getLivestockById(id) {
+    const readings = await fetchSensorReadings(id, 7);
+    if (!readings.length) {
+        return null;
+    }
+
+    return buildLivestockRecord(sortByLatestTimestamp(readings)[0]);
 }
 
-// Get alerts by filter
-function getAlertsByFilter(filter) {
-    if (filter === 'all') return ALERTS_DATA;
-    return ALERTS_DATA.filter(a => a.type === filter);
+async function getAlertsByFilter(filter = 'all') {
+    const readings = await fetchSensorReadings(null, 250);
+    const alerts = readings.map(buildAlertRecord).filter(Boolean);
+
+    if (filter === 'all') {
+        return alerts;
+    }
+
+    return alerts.filter(alert => alert.type === filter);
 }

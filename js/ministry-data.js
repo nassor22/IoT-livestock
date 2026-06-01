@@ -1,127 +1,189 @@
 /**
  * Ministry Data Module
- * Mock aggregated data for ministry dashboard
- * Note: All data is aggregated and anonymized - no individual farmer data
+ * Live sensor aggregation helpers for ministry pages
  */
 
-const REGIONAL_DATA = {
-    dar: {
-        name: 'Dar es Salaam',
-        monitored: 8245,
-        healthy: 7822,
-        alerts: 423,
-        riskLevel: 'medium',
-        trend: '+2.3%',
-        trendDirection: 'up'
-    },
-    arusha: {
-        name: 'Arusha',
-        monitored: 6892,
-        healthy: 6580,
-        alerts: 312,
-        riskLevel: 'low',
-        trend: '-1.8%',
-        trendDirection: 'down'
-    },
-    mbeya: {
-        name: 'Mbeya',
-        monitored: 4521,
-        healthy: 4132,
-        alerts: 389,
-        riskLevel: 'high',
-        trend: '+5.1%',
-        trendDirection: 'up'
-    },
-    dodoma: {
-        name: 'Dodoma',
-        monitored: 2876,
-        healthy: 2720,
-        alerts: 156,
-        riskLevel: 'low',
-        trend: '-0.5%',
-        trendDirection: 'down'
-    },
-    kilimanjaro: {
-        name: 'Kilimanjaro',
-        monitored: 2322,
-        healthy: 2174,
-        alerts: 148,
-        riskLevel: 'medium',
-        trend: '-1.2%',
-        trendDirection: 'down'
-    },
-    iringa: {
-        name: 'Iringa',
-        monitored: 1456,
-        healthy: 1389,
-        alerts: 67,
-        riskLevel: 'low',
-        trend: '-0.3%',
-        trendDirection: 'down'
-    },
-    mwanza: {
-        name: 'Mwanza',
-        monitored: 1234,
-        healthy: 1122,
-        alerts: 112,
-        riskLevel: 'high',
-        trend: '+4.2%',
-        trendDirection: 'up'
-    },
-    tanga: {
-        name: 'Tanga',
-        monitored: 987,
-        healthy: 935,
-        alerts: 52,
-        riskLevel: 'medium',
-        trend: '+1.5%',
-        trendDirection: 'up'
+const SENSOR_API_BASE = 'http://localhost:8000';
+
+async function fetchSensorReadings(limit = 500) {
+    try {
+        const response = await fetch(`${SENSOR_API_BASE}/data?limit=${limit}`);
+        if (!response.ok) {
+            return [];
+        }
+
+        const payload = await response.json();
+        return Array.isArray(payload) ? payload : [];
+    } catch (error) {
+        console.warn('Unable to load live ministry sensor data.', error);
+        return [];
     }
-};
-
-const NATIONAL_STATS = {
-    totalMonitored: 24856,
-    healthyAnimals: 23142,
-    activeAlerts: 1428,
-    highRiskAreas: 8
-};
-
-const DISEASE_TRENDS = {
-    labels: ['Week 1', 'Week 2', 'Week 3', 'Week 4'],
-    datasets: {
-        respiratory: [120, 145, 132, 158],
-        digestive: [89, 96, 112, 105],
-        fever: [210, 234, 245, 267],
-        skin: [67, 78, 89, 95]
-    }
-};
-
-const ALERT_DISTRIBUTION = {
-    labels: ['High Fever', 'Low Activity', 'Respiratory', 'Digestive', 'Skin Issues', 'Other'],
-    data: [35, 25, 18, 12, 6, 4]
-};
-
-// Get total national statistics
-function getNationalStats() {
-    return NATIONAL_STATS;
 }
 
-// Get regional data by ID
-function getRegionalData(regionId) {
-    return REGIONAL_DATA[regionId] || null;
+function getNumericValue(value) {
+    if (value === undefined || value === null || value === '') {
+        return null;
+    }
+
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
 }
 
-// Get all regional data
+function resolveAnimalId(reading) {
+    return reading.animal_id || reading.animalId || reading.cowId || reading.id || 'UNKNOWN';
+}
+
+function getReadingStatus(bodyTemp, pulseRate, thi) {
+    if ((bodyTemp != null && bodyTemp > 39.8) || (pulseRate != null && pulseRate > 110) || (thi != null && thi >= 72)) {
+        return 'alert';
+    }
+
+    if ((bodyTemp != null && bodyTemp > 39.2) || (pulseRate != null && (pulseRate < 50 || pulseRate > 100))) {
+        return 'warning';
+    }
+
+    return 'normal';
+}
+
+function buildLatestAnimalMap(readings) {
+    const latestByAnimal = new Map();
+
+    const orderedReadings = [...readings].sort((left, right) => {
+        const leftTime = new Date(left.timestamp || 0).getTime();
+        const rightTime = new Date(right.timestamp || 0).getTime();
+        return rightTime - leftTime;
+    });
+
+    for (const reading of orderedReadings) {
+        const animalId = resolveAnimalId(reading);
+        if (!latestByAnimal.has(animalId)) {
+            latestByAnimal.set(animalId, reading);
+        }
+    }
+
+    return Array.from(latestByAnimal.values());
+}
+
+function deriveDailySeries(readings) {
+    const days = new Map();
+
+    for (const reading of readings) {
+        const timestamp = reading.timestamp ? new Date(reading.timestamp) : null;
+        if (!timestamp || Number.isNaN(timestamp.getTime())) {
+            continue;
+        }
+
+        const key = timestamp.toISOString().slice(0, 10);
+        const entry = days.get(key) || {
+            bodyTemps: [],
+            pulseRates: [],
+            alerts: 0
+        };
+
+        const bodyTemp = getNumericValue(reading.body_temp ?? reading.bodyTemperature);
+        const pulseRate = getNumericValue(reading.pulse_rate ?? reading.heart_rate ?? reading.activity);
+        const thi = getNumericValue(reading.thi);
+        const status = getReadingStatus(bodyTemp, pulseRate, thi);
+
+        if (bodyTemp != null) {
+            entry.bodyTemps.push(bodyTemp);
+        }
+        if (pulseRate != null) {
+            entry.pulseRates.push(pulseRate);
+        }
+        if (status !== 'normal') {
+            entry.alerts += 1;
+        }
+
+        days.set(key, entry);
+    }
+
+    const labels = Array.from(days.keys()).sort();
+    return {
+        labels,
+        datasets: {
+            bodyTemp: labels.map(label => {
+                const entry = days.get(label);
+                if (!entry.bodyTemps.length) return null;
+                const total = entry.bodyTemps.reduce((sum, value) => sum + value, 0);
+                return Number((total / entry.bodyTemps.length).toFixed(1));
+            }),
+            pulseRate: labels.map(label => {
+                const entry = days.get(label);
+                if (!entry.pulseRates.length) return null;
+                const total = entry.pulseRates.reduce((sum, value) => sum + value, 0);
+                return Math.round(total / entry.pulseRates.length);
+            }),
+            alerts: labels.map(label => days.get(label).alerts)
+        }
+    };
+}
+
+async function getNationalStats() {
+    const readings = await fetchSensorReadings(500);
+    const latestAnimals = buildLatestAnimalMap(readings);
+    const healthyAnimals = latestAnimals.filter(reading => getReadingStatus(
+        getNumericValue(reading.body_temp ?? reading.bodyTemperature),
+        getNumericValue(reading.pulse_rate ?? reading.heart_rate ?? reading.activity),
+        getNumericValue(reading.thi)
+    ) === 'normal').length;
+    const activeAlerts = latestAnimals.filter(reading => getReadingStatus(
+        getNumericValue(reading.body_temp ?? reading.bodyTemperature),
+        getNumericValue(reading.pulse_rate ?? reading.heart_rate ?? reading.activity),
+        getNumericValue(reading.thi)
+    ) !== 'normal').length;
+
+    return {
+        totalMonitored: latestAnimals.length,
+        healthyAnimals,
+        activeAlerts,
+        highRiskAreas: activeAlerts
+    };
+}
+
+function getRegionalData() {
+    return null;
+}
+
 function getAllRegionalData() {
-    return Object.values(REGIONAL_DATA);
+    return [];
 }
 
-// Get disease trends data
-function getDiseaseTrends() {
-    return DISEASE_TRENDS;
+async function getDiseaseTrends() {
+    const readings = await fetchSensorReadings(500);
+    const series = deriveDailySeries(readings);
+
+    return {
+        labels: series.labels,
+        datasets: {
+            bodyTemp: series.datasets.bodyTemp,
+            pulseRate: series.datasets.pulseRate,
+            alerts: series.datasets.alerts
+        }
+    };
 }
 
-// Get alert distribution
-function getAlertDistribution() {
-    return ALERT_DISTRIBUTION;
+async function getAlertDistribution() {
+    const readings = await fetchSensorReadings(500);
+    const latestAnimals = buildLatestAnimalMap(readings);
+    const normal = latestAnimals.filter(reading => getReadingStatus(
+        getNumericValue(reading.body_temp ?? reading.bodyTemperature),
+        getNumericValue(reading.pulse_rate ?? reading.heart_rate ?? reading.activity),
+        getNumericValue(reading.thi)
+    ) === 'normal').length;
+    const warning = latestAnimals.filter(reading => getReadingStatus(
+        getNumericValue(reading.body_temp ?? reading.bodyTemperature),
+        getNumericValue(reading.pulse_rate ?? reading.heart_rate ?? reading.activity),
+        getNumericValue(reading.thi)
+    ) === 'warning').length;
+    const alert = latestAnimals.filter(reading => getReadingStatus(
+        getNumericValue(reading.body_temp ?? reading.bodyTemperature),
+        getNumericValue(reading.pulse_rate ?? reading.heart_rate ?? reading.activity),
+        getNumericValue(reading.thi)
+    ) === 'alert').length;
+
+    return {
+        labels: ['Normal', 'Warning', 'Alert'],
+        data: [normal, warning, alert]
+    };
 }

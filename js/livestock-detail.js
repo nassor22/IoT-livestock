@@ -17,8 +17,13 @@ document.addEventListener('DOMContentLoaded', async function() {
     }
     
     // Get selected animal
-    const animalId = sessionStorage.getItem('selectedAnimal') || 'COW-001';
-    const animal = getLivestockById(animalId) || getFallbackAnimal(animalId);
+    const animalId = sessionStorage.getItem('selectedAnimal');
+    if (!animalId) {
+        renderNoSelectedAnimal();
+        return;
+    }
+
+    const animal = (await getLivestockById(animalId)) || getEmptyAnimal(animalId);
 
     renderAnimalDetail(animal);
     initPeriodButtons();
@@ -26,10 +31,10 @@ document.addEventListener('DOMContentLoaded', async function() {
     await loadSensorData(animalId, animal);
 });
 
-function getFallbackAnimal(animalId) {
+function getEmptyAnimal(animalId) {
     return {
         id: animalId,
-        type: 'Livestock',
+        type: 'Sensor Node',
         age: 'Unknown',
         icon: 'fa-cow',
         status: 'normal',
@@ -39,6 +44,25 @@ function getFallbackAnimal(animalId) {
         rumination: 'Unknown',
         lastUpdate: 'Waiting for sensor data'
     };
+}
+
+function renderNoSelectedAnimal() {
+    document.getElementById('animalId').textContent = 'No animal selected';
+    document.getElementById('animalType').textContent = 'Choose a livestock record from the dashboard';
+
+    const statusBadge = document.getElementById('animalStatus');
+    statusBadge.className = 'status-badge status-normal';
+    statusBadge.innerHTML = '<i class="fas fa-circle-notch"></i> Awaiting data';
+
+    updateReading('bodyTemp', '--°C', 'status-value');
+    updateReading('pulseRate', '-- bpm', 'status-value');
+    updateReading('rumination', 'Unknown', 'status-value');
+    updateReading('lastUpdated', 'Waiting for sensor data', 'status-value');
+
+    updateReading('envTemp', '--', 'env-value');
+    updateReading('envHumidity', '--', 'env-value');
+    updateReading('envHeatIndex', '--', 'env-value');
+    updateReading('envGps', 'Waiting for GPS data', 'env-value');
 }
 
 async function loadSensorData(animalId, animal) {
@@ -57,7 +81,7 @@ async function loadSensorData(animalId, animal) {
 
         initCharts(animalId, historyReadings);
     } catch (error) {
-        console.warn('Live sensor data unavailable, using demo chart data.', error);
+        console.warn('Live sensor data unavailable.', error);
         initCharts(animalId, []);
     }
 }
@@ -79,7 +103,7 @@ function renderAnimalDetail(animal) {
     // Current readings
     updateReading('bodyTemp', animal.temperature == null ? '--°C' : `${animal.temperature}°C`, getTemperatureClass(animal.temperature));
     
-    updateReading('pulseRate', '-- bpm', 'status-value low');
+    updateReading('pulseRate', animal.pulseRate == null ? '-- bpm' : `${Math.round(animal.pulseRate)} bpm`, getPulseClass(animal.pulseRate));
     
     updateReading('rumination', animal.rumination, `status-value ${animal.rumination === 'Reduced' ? 'low' : 'normal'}`);
     
@@ -88,22 +112,20 @@ function renderAnimalDetail(animal) {
     updateReading('envTemp', '--', 'env-value');
     updateReading('envHumidity', '--', 'env-value');
     updateReading('envHeatIndex', '--', 'env-value');
-    updateReading('envGps', 'No Fix', 'env-value');
+    updateReading('envGps', 'Waiting for GPS data', 'env-value');
 }
 
 // Initialize charts
 function initCharts(animalId, historyReadings = []) {
     const orderedReadings = Array.isArray(historyReadings) ? [...historyReadings].reverse() : [];
-    const chartLabels = orderedReadings.length > 0
-        ? orderedReadings.map(reading => formatHistoryLabel(reading.timestamp))
-        : TEMPERATURE_HISTORY.labels;
+    const chartLabels = orderedReadings.map(reading => formatHistoryLabel(reading.timestamp));
 
     // Temperature Chart
     const tempCtx = document.getElementById('tempChart').getContext('2d');
     
     const tempData = orderedReadings.length > 0
         ? orderedReadings.map(reading => reading.body_temp ?? reading.bodyTemperature ?? null).filter(value => value !== null)
-        : (TEMPERATURE_HISTORY.datasets[animalId] || [38.5, 38.5, 38.6, 38.5, 38.4, 38.5, 38.5]);
+        : [];
 
     if (window.tempChart && typeof window.tempChart.destroy === 'function') {
         window.tempChart.destroy();
@@ -163,7 +185,7 @@ function initCharts(animalId, historyReadings = []) {
     
     const pulseData = orderedReadings.length > 0
         ? orderedReadings.map(reading => reading.pulse_rate ?? reading.heart_rate ?? reading.activity ?? null).filter(value => value !== null)
-        : (ACTIVITY_HISTORY.datasets[animalId] || [65, 70, 75, 80, 75, 70, 65]);
+        : [];
 
     if (window.activityChart && typeof window.activityChart.destroy === 'function') {
         window.activityChart.destroy();
@@ -174,7 +196,7 @@ function initCharts(animalId, historyReadings = []) {
         data: {
             labels: chartLabels,
             datasets: [{
-                label: orderedReadings.length > 0 ? 'Pulse Rate' : 'Activity Level',
+                label: orderedReadings.length > 0 ? 'Pulse Rate' : 'No live data yet',
                 data: pulseData,
                 backgroundColor: 'rgba(46, 125, 50, 0.7)',
                 borderColor: '#2E7D32',
@@ -312,8 +334,6 @@ function initPeriodButtons() {
             parent.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
             this.classList.add('active');
             
-            // In a real app, this would fetch new data based on the period
-            // For demo, we just update the UI
             const period = this.dataset.period;
             console.log('Selected period:', period);
         });

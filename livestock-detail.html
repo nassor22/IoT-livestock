@@ -24,12 +24,12 @@
                         <i class="fas fa-cow"></i>
                     </div>
                     <div class="animal-title">
-                        <h1 id="animalId">COW-001</h1>
-                        <p id="animalType">Dairy Cow • 3 years old</p>
+                        <h1 id="animalId">--</h1>
+                        <p id="animalType">Awaiting live sensor data</p>
                     </div>
-                    <div class="status-badge status-warning" id="animalStatus">
-                        <i class="fas fa-exclamation-circle"></i>
-                        Warning
+                    <div class="status-badge status-normal" id="animalStatus">
+                        <i class="fas fa-circle-notch"></i>
+                        Awaiting data
                     </div>
                 </div>
             </div>
@@ -45,28 +45,28 @@
                         <i class="fas fa-thermometer-half"></i>
                         Body Temperature
                     </span>
-                    <span class="status-value high" id="bodyTemp">39.8°C</span>
+                    <span class="status-value" id="bodyTemp">--°C</span>
                 </div>
                 <div class="status-row">
                     <span class="status-label">
                         <i class="fas fa-running"></i>
                         Pulse Rate
                     </span>
-                    <span class="status-value low" id="pulseRate">-- bpm</span>
+                    <span class="status-value" id="pulseRate">-- bpm</span>
                 </div>
                 <div class="status-row">
                     <span class="status-label">
                         <i class="fas fa-utensils"></i>
                         Rumination
                     </span>
-                    <span class="status-value" id="rumination">Normal</span>
+                    <span class="status-value" id="rumination">Unknown</span>
                 </div>
                 <div class="status-row">
                     <span class="status-label">
                         <i class="fas fa-clock"></i>
                         Last Updated
                     </span>
-                    <span class="status-value" id="lastUpdated">5 min ago</span>
+                    <span class="status-value" id="lastUpdated">Waiting for sensor data</span>
                 </div>
             </section>
 
@@ -121,7 +121,7 @@
                     <div class="env-icon">
                         <i class="fas fa-satellite-dish"></i>
                     </div>
-                    <div class="env-value" id="envGps">No Fix</div>
+                    <div class="env-value" id="envGps">Waiting for GPS data</div>
                     <div class="env-label">GPS Data</div>
                 </div>
                 <div class="env-card">
@@ -137,34 +137,9 @@
             <section class="history-section">
                 <h3 class="section-title mb-md">Recent History</h3>
                 <div id="historyTimeline">
-                    <div class="history-item">
-                        <div class="history-marker">
-                            <div class="history-dot warning"></div>
-                            <div class="history-line"></div>
-                        </div>
-                        <div class="history-content">
-                            <div class="history-title">Temperature elevated to 39.8°C</div>
-                            <div class="history-time">Today, 10:30 AM</div>
-                        </div>
-                    </div>
-                    <div class="history-item">
-                        <div class="history-marker">
-                            <div class="history-dot"></div>
-                            <div class="history-line"></div>
-                        </div>
-                        <div class="history-content">
-                            <div class="history-title">Activity level decreased</div>
-                            <div class="history-time">Today, 8:15 AM</div>
-                        </div>
-                    </div>
-                    <div class="history-item">
-                        <div class="history-marker">
-                            <div class="history-dot"></div>
-                        </div>
-                        <div class="history-content">
-                            <div class="history-title">All vitals normal</div>
-                            <div class="history-time">Yesterday, 6:00 PM</div>
-                        </div>
+                    <div class="empty-state">
+                        <i class="fas fa-wave-square"></i>
+                        <p>Recent sensor history will appear here when live readings are available.</p>
                     </div>
                 </div>
             </section>

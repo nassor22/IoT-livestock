@@ -2,7 +2,7 @@
  * Farmer Livestock List Page Module
  */
 
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function() {
     // Check authentication
     const user = checkAuth();
     if (!user) return;
@@ -14,34 +14,34 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // Initialize page
-    initLivestockPage();
+    await initLivestockPage();
 });
 
-function initLivestockPage() {
-    renderStats();
-    renderFullLivestockList('all');
+async function initLivestockPage() {
+    await renderStats();
+    await renderFullLivestockList('all');
     initFilters();
     initSearch();
 }
 
 // Render statistics
-function renderStats() {
-    const stats = getLivestockStats();
+async function renderStats() {
+    const stats = await getLivestockStats();
     document.getElementById('totalAnimals').textContent = stats.total;
     document.getElementById('warningCount').textContent = stats.warning;
     document.getElementById('alertCount').textContent = stats.alert;
 }
 
 // Render full livestock list
-function renderFullLivestockList(filter) {
+async function renderFullLivestockList(filter) {
     const container = document.getElementById('fullLivestockList');
-    const livestock = getLivestockByFilter(filter);
+    const livestock = await getLivestockByFilter(filter);
     
     if (livestock.length === 0) {
         container.innerHTML = `
             <div class="empty-state">
                 <i class="fas fa-search"></i>
-                <p>No animals found with this filter</p>
+                <p>No live sensor animals found with this filter</p>
             </div>
         `;
         return;
