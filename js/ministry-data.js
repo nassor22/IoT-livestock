@@ -3,7 +3,7 @@
  * Live sensor aggregation helpers for ministry pages
  */
 
-const SENSOR_API_BASE = 'http://localhost:8000';
+const SENSOR_API_BASE = 'https://iot-livestock.onrender.com';
 
 async function fetchSensorReadings(limit = 500) {
     try {

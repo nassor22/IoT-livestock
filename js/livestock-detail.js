@@ -3,7 +3,7 @@
  * Handles individual animal detail view with charts
  */
 
-const SENSOR_API_BASE = 'http://localhost:8000';
+const SENSOR_API_BASE = 'https://iot-livestock.onrender.com';
 
 document.addEventListener('DOMContentLoaded', async function() {
     // Check authentication

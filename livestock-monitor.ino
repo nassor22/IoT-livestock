@@ -7,9 +7,8 @@ const int PULSE_PIN  = 3;   // Connected to Pulse Sensor S (ADC1 Channel 3)
 const int GPS_RX_PIN = 13;  // Connected to Neo-6M TX
 const int GPS_TX_PIN = 12;  // Connected to Neo-6M RX
 
-// --- Local Server Configuration ---
-// Change this to match your computer's IP from running 'hostname -I'
-const char* serverUrl = "http://192.168.1.17:8000/api/livestock";
+
+const char* serverUrl = "https://iot-livestock.onrender.com/api/livestock";
 
 // --- Wi-Fi Credentials ---
 const char* ssid     = "The Lord of the PINGS";

@@ -3,7 +3,7 @@
  * Live sensor-backed helper functions for farmer pages
  */
 
-const SENSOR_API_BASE = 'http://localhost:8000';
+const SENSOR_API_BASE = 'https://iot-livestock.onrender.com';
 
 async function fetchSensorReadings(animalId = null, limit = 500) {
     const url = animalId
