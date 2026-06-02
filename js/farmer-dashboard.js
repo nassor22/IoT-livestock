@@ -21,7 +21,31 @@ document.addEventListener('DOMContentLoaded', async function() {
     await initDashboard();
     initFilters();
     initOfflineDetection();
+    subscribeToTelemetryUpdates(scheduleDashboardRefresh);
+    scheduleDashboardRefresh();
 });
+
+let dashboardRefreshTimer = null;
+
+function scheduleDashboardRefresh() {
+    if (dashboardRefreshTimer) {
+        clearTimeout(dashboardRefreshTimer);
+    }
+
+    dashboardRefreshTimer = setTimeout(() => {
+        dashboardRefreshTimer = null;
+        refreshDashboard();
+    }, 150);
+}
+
+async function refreshDashboard() {
+    await Promise.all([
+        renderStats(),
+        renderLivestockList(document.querySelector('.filter-tab.active')?.dataset.filter || 'all'),
+        renderAlerts(),
+        renderRecommendations()
+    ]);
+}
 
 // Initialize dashboard data
 async function initDashboard() {

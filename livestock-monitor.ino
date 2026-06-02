@@ -4,57 +4,58 @@
 // --- Hardware Pin Configurations ---
 const int DHT11_PIN  = 4;   // Connected to DHT Out
 const int PULSE_PIN  = 3;   // Connected to Pulse Sensor S (ADC1 Channel 3)
-const int GPS_RX_PIN = 13;  // Connected to Neo-6M TX
-const int GPS_TX_PIN = 12;  // Connected to Neo-6M RX
+const int GPS_RX_PIN = 13;  // Connected to Neo-6M TX -> (Switch wires if data doesn't flow)
+const int GPS_TX_PIN = 12;  // Connected to Neo-6M RX -> (Switch wires if data doesn't flow)
 
+// --- Firebase Cloud Database Configuration ---
+// Formatted exactly from your screenshot. Note the HTTP protocol and trailing .json!
+const char* firebaseUrl = "http://iot-livestock-439f2-default-rtdb.asia-southeast1.firebasedatabase.app/livestock/COW-001.json";
 
-const char* serverUrl = "https://iot-livestock.onrender.com/api/livestock";
-
-// --- Wi-Fi Credentials ---
+// --- Wi-Fi Network Credentials ---
 const char* ssid     = "The Lord of the PINGS";
 const char* password = "987667890";
 
 // --- Global Telemetry Variables ---
 volatile int g_pulse_raw = 0;
 String g_gps_raw_string  = "No Fix";
-float g_temperature_c    = 24.0; // Default baseline value
+float g_temperature_c    = 24.0; // Baseline initial variable state
 
-// Forward declaration of the FreeRTOS background task
+// Forward declaration of the pulse monitoring background worker
 void pulseSensorTask(void *pvParameters);
 
-// --- Simple Non-Blocking DHT11 Reader Function ---
+// --- Non-Blocking Software DHT11 Driver Routine ---
 float readDHT11Temperature() {
     uint8_t bits[5] = {0, 0, 0, 0, 0};
     uint8_t cnt = 7;
     uint8_t idx = 0;
 
-    // Send Handshake / Start Signal to DHT11
+    // Send Handshake / Trigger pulse down the wire
     pinMode(DHT11_PIN, OUTPUT);
     digitalWrite(DHT11_PIN, LOW);
-    delay(18); // Keep low for at least 18ms
+    delay(18); 
     digitalWrite(DHT11_PIN, HIGH);
     delayMicroseconds(40);
     pinMode(DHT11_PIN, INPUT);
 
-    // Acknowledge pulse timing window from sensor
-    unsigned int loopCount = 10000;
-    while(digitalRead(DHT11_PIN) == LOW) if (loopCount-- == 0) return g_temperature_c;
-    loopCount = 10000;
-    while(digitalRead(DHT11_PIN) == HIGH) if (loopCount-- == 0) return g_temperature_c;
+    // Watch for response timeout windows
+    unsigned int timeoutCheck = 10000;
+    while(digitalRead(DHT11_PIN) == LOW) if (timeoutCheck-- == 0) return g_temperature_c;
+    timeoutCheck = 10000;
+    while(digitalRead(DHT11_PIN) == HIGH) if (timeoutCheck-- == 0) return g_temperature_c;
 
-    // Read the 40-bit data packet output stream
+    // Capture and reconstruct the 40-bit transmission train
     for (int i = 0; i < 40; i++) {
-        loopCount = 10000;
-        while(digitalRead(DHT11_PIN) == LOW) if (loopCount-- == 0) return g_temperature_c;
+        timeoutCheck = 10000;
+        while(digitalRead(DHT11_PIN) == LOW) if (timeoutCheck-- == 0) return g_temperature_c;
         
-        unsigned long t = micros();
-        loopCount = 10000;
-        while(digitalRead(DHT11_PIN) == HIGH) if (loopCount-- == 0) return g_temperature_c;
+        unsigned long timingBit = micros();
+        timeoutCheck = 10000;
+        while(digitalRead(DHT11_PIN) == HIGH) if (timeoutCheck-- == 0) return g_temperature_c;
 
-        if ((micros() - t) > 40) {
+        if ((micros() - timingBit) > 40) {
             bits[idx] |= (1 << cnt);
         }
-        if (cnt == 0) {   // next byte
+        if (cnt == 0) {   
             cnt = 7;     
             idx++;      
         } else {
@@ -62,26 +63,24 @@ float readDHT11Temperature() {
         }
     }
 
-    // Run simple checksum validation check
+    // Process basic arithmetic checksum validation
     if ((bits[0] + bits[1] + bits[2] + bits[3]) == bits[4]) {
-        // bits[2] holds the integral temperature integer value for DHT11
-        return (float)bits[2];
+        return (float)bits[2]; // Return validated byte structure integer data
     }
-    
-    return g_temperature_c; // Return last known good temperature if checksum drops
+    return g_temperature_c; 
 }
 
 void setup() {
-  // Initialize Serial Monitor for USB Diagnostics
+  // Spawn main tracking diagnostic USB port
   Serial.begin(115200);
   delay(1000);
-  Serial.println("\n--- Starting COW-001 Livestock Hardware Node ---");
+  Serial.println("\n--- Initiating Firebase Production Firmware Node ---");
 
-  // Initialize GPS on hardware serial bus (UART1) using pins 13 and 12
+  // Spin up dedicated hardware serial abstraction (UART1) for GPS parsing
   Serial1.begin(9600, SERIAL_8N1, GPS_RX_PIN, GPS_TX_PIN);
 
-  // Initialize Wi-Fi connection loop
-  Serial.print("Connecting to Wi-Fi Network: ");
+  // Establish stable network link
+  Serial.print("Connecting to Wi-Fi Access Point: ");
   Serial.println(ssid);
   WiFi.begin(ssid, password);
 
@@ -89,11 +88,11 @@ void setup() {
     delay(500);
     Serial.print(".");
   }
-  Serial.println("\nWi-Fi Connected Successfully!");
-  Serial.print("ESP32-C6 Local Node IP: ");
+  Serial.println("\nWi-Fi Handshake Success!");
+  Serial.print("Local Network Assigned IP: ");
   Serial.println(WiFi.localIP());
 
-  // Spin up background target loop on Core 0 for real-time heartbeat polling
+  // Instantiate parallel core FreeRTOS task layer targeting heart rate values
   xTaskCreate(
     pulseSensorTask,   
     "PulseTask",       
@@ -111,63 +110,72 @@ void loop() {
     if (gpsLine.startsWith("$GPRMC") || gpsLine.startsWith("$GPGGA")) {
       g_gps_raw_string = gpsLine;
       g_gps_raw_string.trim(); 
-      Serial.print("[GPS Live Stream] ");
+      Serial.print("[GPS Stream] Captured NMEA: ");
       Serial.println(g_gps_raw_string);
     }
   }
 
-  // --- 2. Check DHT11 Environmental Status (Every 10 Seconds) ---
-  static unsigned long lastDhtTime = 0;
-  if (millis() - lastDhtTime >= 10000) { 
-    lastDhtTime = millis();
-    float localTemp = readDHT11Temperature();
-    if (localTemp > 0) {
-        g_temperature_c = localTemp;
+  // --- 2. Check DHT11 Microclimate Core Metrics (Every 10 Seconds) ---
+  static unsigned long lastDhtReadTime = 0;
+  if (millis() - lastDhtReadTime >= 10000) { 
+    lastDhtReadTime = millis();
+    float currentTemp = readDHT11Temperature();
+    if (currentTemp > 0) {
+        g_temperature_c = currentTemp;
     }
-    Serial.print("[DHT11 Internal Check] Calculated Core Temp: ");
-    Serial.concat(g_temperature_c);
+    Serial.print("[DHT11 State] Environmental Reading: ");
+    Serial.print(g_temperature_c, 1);
     Serial.println(" °C");
   }
 
-  // --- 3. Package and Stream Payload to Local Node.js Server (Every 5 Seconds) ---
-  static unsigned long lastStreamTime = 0;
-  if (millis() - lastStreamTime >= 5000) { 
-    lastStreamTime = millis();
+  // --- 3. Stream Telemetry Directly to Firebase Realtime Database (Every 5 Seconds) ---
+  static unsigned long lastFirebaseSyncTime = 0;
+  if (millis() - lastFirebaseSyncTime >= 5000) { 
+    lastFirebaseSyncTime = millis();
 
     if (WiFi.status() == WL_CONNECTED) {
       HTTPClient http;
-      http.begin(serverUrl);
       
-      // Setup payload content headers matching standard key=value URL formatting
-      http.addHeader("Content-Type", "application/x-www-form-urlencoded");
+      // Initialize endpoint connection to Firebase REST structure
+      http.begin(firebaseUrl);
       
-      String postData = "cowId=COW-001"
-                        "&bodyTemperature=" + String(g_temperature_c, 1) + 
-                        "&pulseRate=" + String(g_pulse_raw) + 
-                        "&gpsData=" + g_gps_raw_string;
+      // Declare pure application/json data structure configuration header
+      http.addHeader("Content-Type", "application/json");
       
-      Serial.println("[HTTP Outbound] Shipping structured data package to local server...");
-      int httpResponseCode = http.POST(postData);
+      // Calculate contextual logic for animal behavior categories
+      String behaviorState = (g_pulse_raw > 2200) ? "High" : "Normal";
+      
+      // Build a clean, properly escaped JSON payload configuration format block
+      String jsonPayload = "{\"cowId\":\"COW-001\""
+                           ",\"bodyTemperature\":" + String(g_temperature_c, 1) + 
+                           ",\"pulseRate\":" + String(g_pulse_raw) + 
+                           ",\"activityLevel\":\"" + behaviorState + "\"" +
+                           ",\"gpsData\":\"" + g_gps_raw_string + "\"}";
+      
+      Serial.println("[Firebase Outbound] Uploading sensor array block directly to cloud node...");
+      
+      // Execute an HTTP PUT to cleanly rewrite and maintain the single track point structure
+      int httpResponseCode = http.PUT(jsonPayload); 
       
       if (httpResponseCode > 0) {
-        Serial.print("[HTTP Success] Server Response Status Token: ");
-        Serial.println(httpResponseCode);
+        Serial.print("[Firebase API Code] Packet synced successfully! Code: ");
+        Serial.println(httpResponseCode); // Expect an HTTP 200 OK from Firebase
       } else {
-        Serial.print("[HTTP Warning] Connection dropped. Reason descriptor: ");
+        Serial.print("[Firebase Warning] Transport layer drop out: ");
         Serial.println(http.errorToString(httpResponseCode).c_str());
       }
       
       http.end(); 
     } else {
-      Serial.println("[Network Error] Outbound dropped: Wi-Fi link inactive.");
+      Serial.println("[Network Alert] Execution halted: Wi-Fi connection link unavailable.");
     }
   }
 }
 
-// --- Independent Thread Stack Execution Worker for Pulse Sensor ---
+// --- Dedicated Asynchronous Core Sampling Worker Stack ---
 void pulseSensorTask(void *pvParameters) {
   while (1) {
     g_pulse_raw = analogRead(PULSE_PIN);
-    vTaskDelay(pdMS_TO_TICKS(200)); // Sleep loop state for 200 milliseconds to balance core resource load
+    vTaskDelay(pdMS_TO_TICKS(200)); // Sleep thread cleanly for 200 milliseconds to avoid thrashing
   }
 }

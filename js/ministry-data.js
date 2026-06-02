@@ -5,7 +5,41 @@
 
 const SENSOR_API_BASE = 'https://iot-livestock.onrender.com';
 
+// Temporary: enable mocked ministry data for testing.
+const USE_MOCKS = true;
+
+const MOCK_MINISTRY_READINGS = [
+    {
+        animal_id: 'COW-001',
+        timestamp: new Date(Date.now() - 1000 * 60 * 60).toISOString(),
+        body_temp: 38.6,
+        pulse_rate: 70,
+        thi: 67.5,
+        region: 'Central'
+    },
+    {
+        animal_id: 'COW-002',
+        timestamp: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
+        body_temp: 40.5,
+        pulse_rate: 118,
+        thi: 74.0,
+        region: 'Central'
+    },
+    {
+        animal_id: 'COW-010',
+        timestamp: new Date(Date.now() - 1000 * 60 * 10).toISOString(),
+        body_temp: 37.8,
+        pulse_rate: 66,
+        thi: 66.2,
+        region: 'North'
+    }
+];
+
 async function fetchSensorReadings(limit = 500) {
+    if (USE_MOCKS) {
+        return MOCK_MINISTRY_READINGS.slice(0, limit);
+    }
+
     try {
         const response = await fetch(`${SENSOR_API_BASE}/data?limit=${limit}`);
         if (!response.ok) {

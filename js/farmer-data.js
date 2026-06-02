@@ -5,7 +5,50 @@
 
 const SENSOR_API_BASE = 'https://iot-livestock.onrender.com';
 
+// Temporary: enable mocked sensor data for local testing.
+// Set to false to restore live sensor reads.
+const USE_MOCKS = true;
+
+const MOCK_SENSOR_READINGS = [
+    {
+        animal_id: 'COW-001',
+        timestamp: new Date(Date.now() - 1000 * 60 * 2).toISOString(),
+        body_temp: 38.5,
+        pulse_rate: 72,
+        thi: 68.2,
+        ambient_temp: 25.1,
+        humidity: 62,
+        gps_data: '0.3476,32.5825'
+    },
+    {
+        animal_id: 'COW-002',
+        timestamp: new Date(Date.now() - 1000 * 60 * 10).toISOString(),
+        body_temp: 40.2,
+        pulse_rate: 120,
+        thi: 73.1,
+        ambient_temp: 26.3,
+        humidity: 58,
+        gps_data: '0.3477,32.5826'
+    },
+    {
+        animal_id: 'COW-003',
+        timestamp: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
+        body_temp: 37.9,
+        pulse_rate: 65,
+        thi: null,
+        ambient_temp: 24.8,
+        humidity: 65,
+        gps_data: null
+    }
+];
+
 async function fetchSensorReadings(animalId = null, limit = 500) {
+    if (USE_MOCKS) {
+        const records = MOCK_SENSOR_READINGS.slice(0, limit);
+        if (!animalId) return records;
+        return records.filter(r => (r.animal_id || r.animalId || r.cowId || r.id) === animalId);
+    }
+
     const url = animalId
         ? `${SENSOR_API_BASE}/api/livestock/${encodeURIComponent(animalId)}/readings?limit=${limit}`
         : `${SENSOR_API_BASE}/data?limit=${limit}`;
