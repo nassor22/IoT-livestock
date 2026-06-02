@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Animals Overview</title>
+  <link rel="stylesheet" href="css/shared.css">
+  <link rel="stylesheet" href="css/farmer.css">
+</head>
+<body>
+  <header class="site-header">
+    <h1>Animals Overview</h1>
+  </header>
+
+  <main class="container">
+    <section>
+      <p>This page shows the latest vitals and location for each monitored animal.</p>
+      <div id="overviewSummary" class="card"></div>
+      <table id="animalsTable" class="table">
+        <thead>
+          <tr>
+            <th>Animal ID</th>
+            <th>Status</th>
+            <th>Temp (°C)</th>
+            <th>Pulse (bpm)</th>
+            <th>THI</th>
+            <th>Location</th>
+            <th>Last Update</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </section>
+  </main>
+
+  <script src="js/farmer-data.js"></script>
+  <script src="js/animals-overview.js"></script>
+</body>
+</html>
