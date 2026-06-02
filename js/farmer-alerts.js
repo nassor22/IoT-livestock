@@ -69,22 +69,27 @@ async function renderAlerts(filter, query) {
                 ? '<span class="sms-sent"><i class="fas fa-check-circle"></i> SMS Sent</span>'
                 : '<span><i class="fas fa-envelope"></i> SMS Pending</span>';
 
+        // Link to livestock detail page; pass animal id as query param
+        const animalLink = alert.animalId ? `livestock-detail.html?id=${encodeURIComponent(alert.animalId)}` : 'livestock-detail.html';
+
         return `
-            <div class="alert-card ${cardClass}" data-status="${alert.type}">
-                <div class="alert-header">
-                    <div class="alert-icon">
-                        <i class="fas ${alert.icon}"></i>
-                    </div>
-                    <div class="alert-content">
-                        <div class="alert-title">${alert.title}</div>
-                        <div class="alert-description">${alert.description}</div>
-                    </div>
-                </div>
-                <div class="alert-meta">
-                    <span><i class="fas fa-clock"></i> ${alert.time}</span>
-                    ${metaStatus}
-                </div>
-            </div>
+            <a href="${animalLink}" class="alert-link">
+              <div class="alert-card ${cardClass}" data-status="${alert.type}">
+                  <div class="alert-header">
+                      <div class="alert-icon">
+                          <i class="fas ${alert.icon}"></i>
+                      </div>
+                      <div class="alert-content">
+                          <div class="alert-title">${alert.title}</div>
+                          <div class="alert-description">${alert.description}</div>
+                      </div>
+                  </div>
+                  <div class="alert-meta">
+                      <span><i class="fas fa-clock"></i> ${alert.time}</span>
+                      ${metaStatus}
+                  </div>
+              </div>
+            </a>
         `;
     }).join('');
 }

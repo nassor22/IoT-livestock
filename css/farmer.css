@@ -239,6 +239,13 @@
     border-left: 4px solid var(--status-alert);
 }
 
+/* Make entire alert card clickable when wrapped in a link */
+.alert-link {
+    display: block;
+    text-decoration: none;
+    color: inherit;
+}
+
 .alert-card.warning {
     border-left-color: var(--status-warning);
 }
@@ -382,13 +389,15 @@
     flex-direction: column;
     align-items: center;
     gap: 4px;
-    padding: var(--spacing-sm);
+    padding: 10px 6px;
     color: var(--text-secondary);
     text-decoration: none;
     font-size: var(--font-xs);
     border-radius: var(--radius-md);
-    min-width: 64px;
+    min-width: 0;
+    flex: 1 1 auto;
     transition: all var(--transition-fast);
+    min-height: 56px; /* touch target */
 }
 
 .nav-item i {
@@ -401,6 +410,11 @@
 
 .nav-item:hover {
     background-color: var(--bg-primary);
+}
+
+@media (max-width: 420px) {
+    .nav-item span { font-size: 11px; }
+    .nav-item i { font-size: 18px; }
 }
 
 /* Filter Tabs */

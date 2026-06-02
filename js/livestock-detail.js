@@ -16,12 +16,17 @@ document.addEventListener('DOMContentLoaded', async function() {
         return;
     }
     
-    // Get selected animal
-    const animalId = sessionStorage.getItem('selectedAnimal');
+    // Get selected animal: prefer URL param `id`, fallback to sessionStorage
+    const urlParams = new URLSearchParams(window.location.search);
+    let animalId = urlParams.get('id') || sessionStorage.getItem('selectedAnimal');
+
     if (!animalId) {
         renderNoSelectedAnimal();
         return;
     }
+
+    // Persist selection for other flows
+    try { sessionStorage.setItem('selectedAnimal', animalId); } catch (e) {}
 
     const animal = (await getLivestockById(animalId)) || getEmptyAnimal(animalId);
 
