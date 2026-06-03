@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Livestock Health Monitor</title>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- CSS File -->
+    <link rel="stylesheet" href="styles.css">
+    
+    <!-- MQTT.js Browser Build -->
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+    
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Lucide Icons CDN -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+    <div class="app-container">
+        
+        <!-- ==================== HOME TAB SCREEN ==================== -->
+        <section id="screen-home" class="app-screen active">
+            <header class="home-header">
+                <h1 id="user-greeting">Hello, Nassor!</h1>
+                <p class="subtitle">Here's your livestock health overview</p>
+            </header>
+            
+            <div class="main-content">
+                <!-- Status Cards Grid -->
+                <div class="stats-grid">
+                    <div class="stat-card total" id="btn-stat-total">
+                        <div class="stat-value" id="stat-total-val">0</div>
+                        <div class="stat-label">TOTAL</div>
+                    </div>
+                    <div class="stat-card warning" id="btn-stat-warning">
+                        <div class="stat-value" id="stat-warning-val">0</div>
+                        <div class="stat-label">WARNING</div>
+                    </div>
+                    <div class="stat-card alert" id="btn-stat-alert">
+                        <div class="stat-value" id="stat-alert-val">0</div>
+                        <div class="stat-label">ALERT</div>
+                    </div>
+                </div>
+                
+                <!-- Home Filter Pills -->
+                <div class="filter-row">
+                    <button class="filter-pill active" data-filter="all">All Animals</button>
+                    <button class="filter-pill" data-filter="normal">Normal</button>
+                    <button class="filter-pill" data-filter="warning">Warning</button>
+                    <button class="filter-pill" data-filter="alert">Alert</button>
+                </div>
+                
+                <!-- Home Livestock List -->
+                <div class="livestock-list" id="home-livestock-list">
+                    <!-- Cards will be populated dynamically -->
+                </div>
+                
+                <!-- Recent Alerts Section -->
+                <div class="section-container">
+                    <div class="section-header">
+                        <h2>Recent Alerts</h2>
+                        <a href="#" class="view-all-link" id="link-view-all-alerts">View All <i data-lucide="chevron-right" class="icon-inline"></i></a>
+                    </div>
+                    <div class="alerts-list" id="home-alerts-list">
+                        <!-- Empty State -->
+                        <div class="empty-state" id="home-alerts-empty">
+                            <div class="empty-icon-wrapper">
+                                <i data-lucide="bell-off" class="empty-icon"></i>
+                            </div>
+                            <p>No live alerts from sensors right now.</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Recommendations Section -->
+                <div class="section-container">
+                    <div class="section-header">
+                        <h2>Recommendations</h2>
+                    </div>
+                    <div class="recommendations-list" id="home-recommendations-list">
+                        <!-- Empty State -->
+                        <div class="empty-state" id="home-recommendations-empty">
+                            <div class="empty-icon-wrapper">
+                                <i data-lucide="clipboard-list" class="empty-icon"></i>
+                            </div>
+                            <p>No recommendations until a sensor crosses a threshold.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <!-- ==================== LIVESTOCK TAB SCREEN ==================== -->
+        <section id="screen-livestock" class="app-screen">
+            <!-- Sub-screen 1: Animal List -->
+            <div id="livestock-list-subscreen" class="subscreen active">
+                <header class="green-header">
+                    <div class="header-title-container">
+                        <i data-lucide="cow" class="header-icon"></i>
+                        <h1>Livestock Inventory</h1>
+                    </div>
+                </header>
+                <div class="main-content">
+                    <div class="search-bar-container">
+                        <i data-lucide="search" class="search-icon"></i>
+                        <input type="text" id="livestock-search-input" placeholder="Search livestock by ID, breed...">
+                    </div>
+                    <div class="livestock-grid" id="livestock-grid-container">
+                        <!-- Populated dynamically -->
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Sub-screen 2: Animal Detail -->
+            <div id="livestock-detail-subscreen" class="subscreen">
+                <div id="detail-header-element" class="detail-header header-awaiting">
+                    <button class="btn-back" id="btn-detail-back">
+                        <i data-lucide="arrow-left"></i>
+                    </button>
+                    <div class="detail-cow-info">
+                        <div class="cow-icon-box">
+                            <i data-lucide="cow" class="cow-icon-large"></i>
+                        </div>
+                        <div class="cow-meta">
+                            <h1 id="detail-cow-name">COW---</h1>
+                            <p id="detail-cow-breed-age">Awaiting live sensor data</p>
+                        </div>
+                        <div class="status-pill state-awaiting" id="detail-status-pill">
+                            <span class="status-dot"></span>
+                            <span id="detail-status-text">Awaiting data</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="main-content">
+                    <!-- Current Readings Card -->
+                    <div class="readings-card">
+                        <div class="readings-header">
+                            <h2>Current Readings</h2>
+                        </div>
+                        <div class="reading-row">
+                            <div class="reading-label-group">
+                                <i data-lucide="thermometer" class="reading-icon text-red"></i>
+                                <span>Body Temperature</span>
+                            </div>
+                            <div class="reading-value font-jakarta" id="detail-reading-temp">--°C</div>
+                        </div>
+                        <div class="reading-row">
+                            <div class="reading-label-group">
+                                <i data-lucide="heart-pulse" class="reading-icon text-blue"></i>
+                                <span>Pulse Rate</span>
+                            </div>
+                            <div class="reading-value font-jakarta" id="detail-reading-pulse">-- bpm</div>
+                        </div>
+                        <div class="reading-row">
+                            <div class="reading-label-group">
+                                <i data-lucide="utensils" class="reading-icon text-green"></i>
+                                <span>Rumination</span>
+                            </div>
+                            <div class="reading-value font-jakarta" id="detail-reading-rumination">Unknown</div>
+                        </div>
+                        <div class="reading-row update-row">
+                            <div class="reading-label-group">
+                                <i data-lucide="clock" class="reading-icon text-grey"></i>
+                                <span>Last Updated</span>
+                            </div>
+                            <div class="reading-time" id="detail-reading-updated">Waiting for sensor data</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Temp Trend Card -->
+                    <div class="chart-card">
+                        <div class="chart-header-row">
+                            <h3>Body Temperature Trend</h3>
+                            <div class="chart-tabs" id="chart-tabs-temp">
+                                <button class="chart-tab active" data-timeframe="24H">24H</button>
+                                <button class="chart-tab" data-timeframe="7D">7D</button>
+                                <button class="chart-tab" data-timeframe="30D">30D</button>
+                            </div>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="chart-temp"></canvas>
+                        </div>
+                    </div>
+                    
+                    <!-- Pulse Trend / Activity Card -->
+                    <div class="chart-card">
+                        <div class="chart-header-row">
+                            <h3>Activity & Movement</h3>
+                            <div class="chart-tabs" id="chart-tabs-activity">
+                                <button class="chart-tab active" data-timeframe="24H">24H</button>
+                                <button class="chart-tab" data-timeframe="7D">7D</button>
+                                <button class="chart-tab" data-timeframe="30D">30D</button>
+                            </div>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="chart-activity"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <!-- ==================== ALERTS TAB SCREEN ==================== -->
+        <section id="screen-alerts" class="app-screen">
+            <header class="green-header row-layout">
+                <div class="header-title-container">
+                    <i data-lucide="alert-triangle" class="header-icon"></i>
+                    <h1>All Alerts</h1>
+                </div>
+                <button class="btn-header-action" id="btn-clear-resolved" title="Clear Resolved Alerts">
+                    <i data-lucide="check-circle-2"></i>
+                </button>
+            </header>
+            
+            <div class="main-content">
+                <!-- Alerts Filter Pills -->
+                <div class="filter-row">
+                    <button class="filter-pill active" data-alert-filter="all">All</button>
+                    <button class="filter-pill" data-alert-filter="critical">Critical</button>
+                    <button class="filter-pill" data-alert-filter="warning">Warning</button>
+                    <button class="filter-pill" data-alert-filter="resolved">Resolved</button>
+                </div>
+                
+                <!-- Search Alerts -->
+                <div class="search-bar-container">
+                    <i data-lucide="search" class="search-icon"></i>
+                    <input type="text" id="alerts-search-input" placeholder="Search alerts...">
+                </div>
+                
+                <!-- Alerts List -->
+                <div class="alerts-vertical-list" id="alerts-list-container">
+                    <!-- Populated dynamically -->
+                </div>
+                
+                <!-- Load More Button -->
+                <button class="btn-load-more" id="btn-load-more-alerts">
+                    <i data-lucide="chevron-down"></i> Load More
+                </button>
+            </div>
+        </section>
+        
+        <!-- ==================== SETTINGS TAB SCREEN ==================== -->
+        <section id="screen-settings" class="app-screen">
+            <header class="green-header">
+                <div class="header-title-container">
+                    <i data-lucide="settings" class="header-icon"></i>
+                    <h1>Settings</h1>
+                </div>
+            </header>
+            
+            <div class="main-content">
+                <!-- MQTT Configuration Section -->
+                <div class="settings-card">
+                    <div class="card-title-row">
+                        <i data-lucide="radio" class="card-icon text-green"></i>
+                        <h2>MQTT Broker Settings</h2>
+                        <span class="status-indicator-light disconnected" id="mqtt-status-indicator"></span>
+                    </div>
+                    
+                    <div class="settings-form">
+                        <div class="form-group">
+                            <label for="mqtt-broker-input">WebSocket Broker URL</label>
+                            <input type="text" id="mqtt-broker-input" placeholder="wss://broker.hivemq.com:8884/mqtt" value="wss://broker.hivemq.com:8884/mqtt">
+                            <small class="form-help">Must be a secure WebSocket (wss://) protocol broker.</small>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="mqtt-topic-input">Subscription Topic</label>
+                            <input type="text" id="mqtt-topic-input" placeholder="sensors/esp32c6/+/telemetry" value="sensors/esp32c6/+/telemetry">
+                        </div>
+                        
+                        <div class="form-row-2">
+                            <div class="form-group">
+                                <label for="mqtt-user-input">Username (Optional)</label>
+                                <input type="text" id="mqtt-user-input" placeholder="Anonymous">
+                            </div>
+                            <div class="form-group">
+                                <label for="mqtt-pass-input">Password (Optional)</label>
+                                <input type="password" id="mqtt-pass-input" placeholder="••••••••">
+                            </div>
+                        </div>
+                        
+                        <div class="button-row">
+                            <button class="btn btn-primary" id="btn-mqtt-connect">Connect Broker</button>
+                            <button class="btn btn-danger hidden" id="btn-mqtt-disconnect">Disconnect</button>
+                        </div>
+                        
+                        <div class="mqtt-console-container">
+                            <div class="console-header">
+                                <span>Real-time Log Console</span>
+                                <button class="btn-clear-console" id="btn-clear-console" title="Clear Logs">
+                                    <i data-lucide="trash-2"></i>
+                                </button>
+                            </div>
+                            <div class="console-body" id="mqtt-console">
+                                <div class="console-line system">[System] Application loaded. Broker disconnected.</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                
+                <!-- Threshold Rules Settings -->
+                <div class="settings-card">
+                    <div class="card-title-row">
+                        <i data-lucide="sliders" class="card-icon text-orange"></i>
+                        <h2>Threshold & Notification Rules</h2>
+                    </div>
+                    
+                    <div class="settings-form">
+                        <div class="form-group">
+                            <label>Body Temperature Thresholds (°C)</label>
+                            <div class="range-inputs">
+                                <div>
+                                    <small>Normal Max</small>
+                                    <input type="number" id="rule-temp-normal" step="0.1" value="39.5">
+                                </div>
+                                <div>
+                                    <small>Warning Max</small>
+                                    <input type="number" id="rule-temp-warning" step="0.1" value="40.0">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Pulse Rate Thresholds (bpm)</label>
+                            <div class="range-inputs">
+                                <div>
+                                    <small>Normal Min</small>
+                                    <input type="number" id="rule-pulse-min" value="48">
+                                </div>
+                                <div>
+                                    <small>Normal Max</small>
+                                    <input type="number" id="rule-pulse-max" value="84">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="owner-name-input">Owner Name (for Welcome Banner)</label>
+                            <input type="text" id="owner-name-input" value="Nassor">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <!-- ==================== BOTTOM NAVIGATION BAR ==================== -->
+        <nav class="bottom-nav">
+            <button class="nav-btn active" data-target="screen-home" id="nav-btn-home">
+                <i data-lucide="home" class="nav-icon"></i>
+                <span class="nav-label">Home</span>
+            </button>
+            <button class="nav-btn" data-target="screen-livestock" id="nav-btn-livestock">
+                <i data-lucide="cow" class="nav-icon"></i>
+                <span class="nav-label">Livestock</span>
+            </button>
+            <button class="nav-btn" data-target="screen-alerts" id="nav-btn-alerts">
+                <i data-lucide="alert-triangle" class="nav-icon"></i>
+                <span class="nav-label">Alerts</span>
+            </button>
+            <button class="nav-btn" data-target="screen-settings" id="nav-btn-settings">
+                <i data-lucide="settings" class="nav-icon"></i>
+                <span class="nav-label">Settings</span>
+            </button>
+        </nav>
+        
+    </div>
+    
+    <!-- App JavaScript -->
+    <script src="app.js"></script>
+</body>
+</html>
