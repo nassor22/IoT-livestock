@@ -10,7 +10,7 @@ const state = {
     mqtt: {
         client: null,
         status: 'disconnected', // 'disconnected', 'connecting', 'connected'
-        brokerUrl: 'wss://broker.hivemq.com:8884/mqtt',
+        brokerUrl: 'wss://broker.emqx.io:8084/mqtt',
         topic: 'nassor22/sensors/esp32c6/+/telemetry',
         username: '',
         password: '',
