@@ -22,6 +22,12 @@ const state = {
         pulseNormalMin: 48,
         pulseNormalMax: 84
     },
+    geofence: {
+        enabled: true,
+        lat: -6.8223,
+        lon: 39.2743,
+        radius: 100
+    },
     // Pre-registered animals
     animals: {
         'COW-001': {
@@ -79,9 +85,12 @@ const state = {
     alertsPageLimit: 5
 };
 
-// --- Chart Instances ---
+// --- Chart & Map Instances ---
 let tempChartInstance = null;
 let activityChartInstance = null;
+let leafletMapInstance = null;
+let mapCircleInstance = null;
+let mapMarkerInstance = null;
 
 // --- Initialize App ---
 document.addEventListener('DOMContentLoaded', () => {
@@ -419,6 +428,40 @@ function openAnimalDetails(cowId) {
     setupChartTimeframeSwitchers('temp', cowId);
     setupChartTimeframeSwitchers('activity', cowId);
 
+    // Update Geofence Display values
+    const geofenceStatusEl = document.getElementById('detail-geofence-status');
+    const coordsEl = document.getElementById('detail-reading-coords');
+    const distanceEl = document.getElementById('detail-reading-distance');
+
+    if (animal.lat && animal.lon) {
+        coordsEl.innerText = `${animal.lat.toFixed(5)}°, ${animal.lon.toFixed(5)}°`;
+        if (state.geofence.enabled) {
+            const dist = calculateDistance(animal.lat, animal.lon, state.geofence.lat, state.geofence.lon);
+            distanceEl.innerText = `${Math.round(dist)} m`;
+            if (dist > state.geofence.radius) {
+                geofenceStatusEl.innerText = 'OUT OF BOUNDS';
+                geofenceStatusEl.className = 'geofence-status state-alert';
+            } else {
+                geofenceStatusEl.innerText = 'SAFE';
+                geofenceStatusEl.className = 'geofence-status state-normal';
+            }
+        } else {
+            distanceEl.innerText = '-- m';
+            geofenceStatusEl.innerText = 'DISABLED';
+            geofenceStatusEl.className = 'geofence-status state-awaiting';
+        }
+    } else {
+        coordsEl.innerText = '-- , --';
+        distanceEl.innerText = '-- m';
+        geofenceStatusEl.innerText = 'AWAITING GPS';
+        geofenceStatusEl.className = 'geofence-status state-awaiting';
+    }
+
+    // Initialize Map
+    setTimeout(() => {
+        initMap(cowId);
+    }, 100);
+
     // Switch screen
     switchTab('screen-livestock');
     showSubscreen('livestock-detail-subscreen');
@@ -435,6 +478,163 @@ function getReadingColorClass(type, val) {
         return 'normal-val';
     }
     return '';
+}
+
+// --- Leaflet Map Lifecycle & Helpers ---
+function initMap(cowId) {
+    const animal = state.animals[cowId];
+    
+    // Clean up previous map instance if it exists
+    if (leafletMapInstance) {
+        leafletMapInstance.remove();
+        leafletMapInstance = null;
+        mapCircleInstance = null;
+        mapMarkerInstance = null;
+    }
+    
+    const mapContainer = document.getElementById('detail-map');
+    if (!mapContainer) return;
+
+    // Center on current geofence or animal position
+    let centerLat = state.geofence.lat;
+    let centerLon = state.geofence.lon;
+    if (animal.lat && animal.lon) {
+        centerLat = animal.lat;
+        centerLon = animal.lon;
+    }
+    
+    try {
+        leafletMapInstance = L.map('detail-map').setView([centerLat, centerLon], 16);
+        
+        // Add OpenStreetMap tiles
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(leafletMapInstance);
+        
+        // Draw Geofence boundaries
+        if (state.geofence.enabled) {
+            let circleColor = '#388e3c'; // Green
+            if (animal.lat && animal.lon) {
+                const dist = calculateDistance(animal.lat, animal.lon, state.geofence.lat, state.geofence.lon);
+                if (dist > state.geofence.radius) {
+                    circleColor = '#d32f2f'; // Red
+                }
+            }
+            mapCircleInstance = L.circle([state.geofence.lat, state.geofence.lon], {
+                color: circleColor,
+                fillColor: circleColor,
+                fillOpacity: 0.15,
+                radius: state.geofence.radius
+            }).addTo(leafletMapInstance);
+        }
+        
+        // Draw animal marker
+        if (animal.lat && animal.lon) {
+            mapMarkerInstance = L.marker([animal.lat, animal.lon]).addTo(leafletMapInstance);
+            mapMarkerInstance.bindPopup(`<b>${animal.id}</b><br>Status: ${animal.status.toUpperCase()}`).openPopup();
+        }
+    } catch (e) {
+        console.error('Error initializing Leaflet map:', e);
+    }
+    
+    // Invalidate map size to trigger correct layout rendering in container
+    setTimeout(() => {
+        if (leafletMapInstance) {
+            leafletMapInstance.invalidateSize();
+        }
+    }, 200);
+}
+
+function updateMap(cowId) {
+    if (!leafletMapInstance) return;
+    const animal = state.animals[cowId];
+    if (!animal.lat || !animal.lon) return;
+    
+    try {
+        // Update Marker Position
+        if (mapMarkerInstance) {
+            mapMarkerInstance.setLatLng([animal.lat, animal.lon]);
+            mapMarkerInstance.getPopup().setContent(`<b>${animal.id}</b><br>Status: ${animal.status.toUpperCase()}`);
+        } else {
+            mapMarkerInstance = L.marker([animal.lat, animal.lon]).addTo(leafletMapInstance);
+            mapMarkerInstance.bindPopup(`<b>${animal.id}</b><br>Status: ${animal.status.toUpperCase()}`).openPopup();
+        }
+        
+        // Update Geofence Circle Color
+        if (mapCircleInstance && state.geofence.enabled) {
+            const dist = calculateDistance(animal.lat, animal.lon, state.geofence.lat, state.geofence.lon);
+            const circleColor = (dist > state.geofence.radius) ? '#d32f2f' : '#388e3c';
+            mapCircleInstance.setStyle({
+                color: circleColor,
+                fillColor: circleColor
+            });
+        }
+        
+        // Auto-center map on animal position
+        leafletMapInstance.panTo([animal.lat, animal.lon]);
+    } catch (e) {
+        console.error('Error updating map marker:', e);
+    }
+}
+
+// --- GPS NMEA Parser ---
+function parseNMEA(nmeaStr) {
+    if (!nmeaStr || typeof nmeaStr !== 'string') return null;
+    const parts = nmeaStr.split(',');
+    
+    const type = parts[0].trim().toUpperCase();
+    if (type === '$GPGGA' && parts.length >= 6) {
+        const latRaw = parts[2];
+        const latDir = parts[3];
+        const lonRaw = parts[4];
+        const lonDir = parts[5];
+        if (!latRaw || !latRaw.trim() || !lonRaw || !lonRaw.trim()) return null;
+        
+        const lat = parseNMEACoordinate(latRaw, latDir);
+        const lon = parseNMEACoordinate(lonRaw, lonDir);
+        return (lat !== null && lon !== null) ? { lat, lon } : null;
+    } else if (type === '$GPRMC' && parts.length >= 7) {
+        const status = parts[2].trim().toUpperCase();
+        if (status !== 'A') return null; // 'A' = active/valid, 'V' = void
+        const latRaw = parts[3];
+        const latDir = parts[4];
+        const lonRaw = parts[5];
+        const lonDir = parts[6];
+        if (!latRaw || !latRaw.trim() || !lonRaw || !lonRaw.trim()) return null;
+        
+        const lat = parseNMEACoordinate(latRaw, latDir);
+        const lon = parseNMEACoordinate(lonRaw, lonDir);
+        return (lat !== null && lon !== null) ? { lat, lon } : null;
+    }
+    return null;
+}
+
+function parseNMEACoordinate(raw, direction) {
+    const dotIdx = raw.indexOf('.');
+    if (dotIdx === -1) return null;
+    const degLen = dotIdx - 2;
+    if (degLen <= 0) return null;
+    
+    const degrees = parseFloat(raw.substring(0, degLen));
+    const minutes = parseFloat(raw.substring(degLen));
+    if (isNaN(degrees) || isNaN(minutes)) return null;
+    
+    let val = degrees + (minutes / 60);
+    if (direction === 'S' || direction === 'W') val = -val;
+    return val;
+}
+
+// --- Haversine Distance Formula ---
+function calculateDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371000; // Earth radius in meters
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
 }
 
 // --- Chart setup ---
@@ -983,6 +1183,19 @@ function handleIncomingTelemetry(rawJson) {
 
         const cow = state.animals[cowId];
         
+        // GPS parsing
+        let parsedLocation = null;
+        if (payload.gps_nmea) {
+            parsedLocation = parseNMEA(payload.gps_nmea);
+        } else if (payload.lat && payload.lon) {
+            parsedLocation = { lat: parseFloat(payload.lat), lon: parseFloat(payload.lon) };
+        }
+        
+        if (parsedLocation) {
+            cow.lat = parsedLocation.lat;
+            cow.lon = parsedLocation.lon;
+        }
+        
         // Temperature parsing with fallback for stringified readings or -127 error code
         let rawTemp = payload.temp || payload.temperature || payload.temperature_c || payload.temperature_sensor_c;
         let temp = parseFloat(rawTemp);
@@ -1042,6 +1255,17 @@ function handleIncomingTelemetry(rawJson) {
             newStatus = 'warning';
         }
         
+        // Geofence breach check (forces 'alert' status)
+        let geofenceBreach = false;
+        let geofenceDistance = 0;
+        if (state.geofence.enabled && cow.lat && cow.lon) {
+            geofenceDistance = calculateDistance(cow.lat, cow.lon, state.geofence.lat, state.geofence.lon);
+            if (geofenceDistance > state.geofence.radius) {
+                geofenceBreach = true;
+                newStatus = 'alert';
+            }
+        }
+        
         cow.status = newStatus;
 
         // 2. Append to historical trend (24H dataset example)
@@ -1071,33 +1295,60 @@ function handleIncomingTelemetry(rawJson) {
             history7d.activity[history7d.activity.length - 1] = simulatedActivity;
         }
 
-        // 3. Trigger Alert if it's Warning or Critical
-        if (newStatus === 'alert' || newStatus === 'warning') {
-            const alertType = newStatus === 'alert' ? 'critical' : 'warning';
-            const alertMessage = `Body temp ${temp.toFixed(1)}°C · Pulse ${pulse} bpm · THI ${thi.toFixed(1)}`;
+        // 3. Trigger Alert if it's Warning, Critical or Geofence Breach
+        if (geofenceBreach) {
+            const geofenceAlertMessage = `Geofence breach! Distance: ${Math.round(geofenceDistance)}m from center`;
+            const existingGeofenceAlert = state.alerts.find(a => a.cowId === cowId && !a.resolved && a.message.includes('Geofence'));
             
-            // Check if there is already an unresolved active alert for this cow of the same type
-            const existingAlert = state.alerts.find(a => a.cowId === cowId && !a.resolved && a.type === alertType);
-            
-            if (!existingAlert) {
+            if (!existingGeofenceAlert) {
                 const newAlert = {
                     id: 'ALERT-' + Math.random().toString(36).substr(2, 9).toUpperCase(),
                     cowId: cowId,
-                    type: alertType,
-                    message: alertMessage,
+                    type: 'critical',
+                    message: geofenceAlertMessage,
                     timestamp: new Date(),
-                    smsStatus: alertType === 'critical' ? 'Pending' : 'None',
+                    smsStatus: 'Pending',
                     resolved: false
                 };
                 state.alerts.unshift(newAlert);
                 
                 // Simulate SMS Dispatching for critical alerts
-                if (newAlert.smsStatus === 'Pending') {
-                    setTimeout(() => {
-                        newAlert.smsStatus = 'Sent';
-                        logToConsole(`[SMS Service] Dispatched emergency alert to Nassor for ${cowId}!`, 'system');
-                        renderAlerts();
-                    }, 4000);
+                setTimeout(() => {
+                    newAlert.smsStatus = 'Sent';
+                    logToConsole(`[SMS Service] Dispatched emergency geofence alert to Nassor for ${cowId}!`, 'system');
+                    renderAlerts();
+                }, 4000);
+            }
+        }
+
+        if (newStatus === 'alert' || newStatus === 'warning') {
+            const alertType = newStatus === 'alert' ? 'critical' : 'warning';
+            
+            // Only trigger sensor alert if it's not purely a geofence breach
+            if (temp > state.thresholds.tempNormalMax || pulse > state.thresholds.pulseNormalMax || pulse < state.thresholds.pulseNormalMin || pulse > 100 || pulse < 40) {
+                const alertMessage = `Body temp ${temp.toFixed(1)}°C · Pulse ${pulse} bpm · THI ${thi.toFixed(1)}`;
+                const existingAlert = state.alerts.find(a => a.cowId === cowId && !a.resolved && a.type === alertType && !a.message.includes('Geofence'));
+                
+                if (!existingAlert) {
+                    const newAlert = {
+                        id: 'ALERT-' + Math.random().toString(36).substr(2, 9).toUpperCase(),
+                        cowId: cowId,
+                        type: alertType,
+                        message: alertMessage,
+                        timestamp: new Date(),
+                        smsStatus: alertType === 'critical' ? 'Pending' : 'None',
+                        resolved: false
+                    };
+                    state.alerts.unshift(newAlert);
+                    
+                    // Simulate SMS Dispatching for critical alerts
+                    if (newAlert.smsStatus === 'Pending') {
+                        setTimeout(() => {
+                            newAlert.smsStatus = 'Sent';
+                            logToConsole(`[SMS Service] Dispatched emergency alert to Nassor for ${cowId}!`, 'system');
+                            renderAlerts();
+                        }, 4000);
+                    }
                 }
             }
         }
@@ -1108,9 +1359,60 @@ function handleIncomingTelemetry(rawJson) {
         renderLivestockList();
         renderAlerts();
 
-        // If currently viewing details for this animal, update details view live!
+        // If currently viewing details for this animal, update details view live (no flicker)!
         if (state.selectedAnimalId === cowId) {
-            openAnimalDetails(cowId);
+            const breedAgeEl = document.getElementById('detail-cow-breed-age');
+            const statusPill = document.getElementById('detail-status-pill');
+            const statusText = document.getElementById('detail-status-text');
+            const headerEl = document.getElementById('detail-header-element');
+
+            statusPill.className = `status-pill state-${cow.status}`;
+            headerEl.className = `detail-header header-${cow.status}`;
+            breedAgeEl.innerText = `${cow.breed} • ${cow.age}`;
+            statusText.innerText = cow.status;
+
+            const tempValEl = document.getElementById('detail-reading-temp');
+            tempValEl.innerText = `${cow.temp.toFixed(1)}°C`;
+            tempValEl.className = `reading-value font-jakarta ${getReadingColorClass('temp', cow.temp)}`;
+
+            const pulseValEl = document.getElementById('detail-reading-pulse');
+            pulseValEl.innerText = `${cow.pulse} bpm`;
+            pulseValEl.className = `reading-value font-jakarta ${getReadingColorClass('pulse', cow.pulse)}`;
+
+            document.getElementById('detail-reading-rumination').innerText = cow.rumination;
+            document.getElementById('detail-reading-updated').innerText = 'Just now';
+
+            // Geofence displays update
+            const geofenceStatusEl = document.getElementById('detail-geofence-status');
+            const coordsEl = document.getElementById('detail-reading-coords');
+            const distanceEl = document.getElementById('detail-reading-distance');
+
+            if (cow.lat && cow.lon) {
+                coordsEl.innerText = `${cow.lat.toFixed(5)}°, ${cow.lon.toFixed(5)}°`;
+                if (state.geofence.enabled) {
+                    const dist = calculateDistance(cow.lat, cow.lon, state.geofence.lat, state.geofence.lon);
+                    distanceEl.innerText = `${Math.round(dist)} m`;
+                    if (dist > state.geofence.radius) {
+                        geofenceStatusEl.innerText = 'OUT OF BOUNDS';
+                        geofenceStatusEl.className = 'geofence-status state-alert';
+                    } else {
+                        geofenceStatusEl.innerText = 'SAFE';
+                        geofenceStatusEl.className = 'geofence-status state-normal';
+                    }
+                } else {
+                    distanceEl.innerText = '-- m';
+                    geofenceStatusEl.innerText = 'DISABLED';
+                    geofenceStatusEl.className = 'geofence-status state-awaiting';
+                }
+            } else {
+                coordsEl.innerText = '-- , --';
+                distanceEl.innerText = '-- m';
+                geofenceStatusEl.innerText = 'AWAITING GPS';
+                geofenceStatusEl.className = 'geofence-status state-awaiting';
+            }
+
+            // Update Leaflet Map coordinates, marker & center
+            updateMap(cowId);
         }
 
         logToConsole(`Processed data for ${cowId}: Status = ${newStatus.toUpperCase()}`, 'system');
@@ -1148,5 +1450,71 @@ function initSettingsListeners() {
     });
     pMaxInput.addEventListener('change', (e) => {
         state.thresholds.pulseNormalMax = parseInt(e.target.value) || 84;
+    });
+
+    // Geofencing Settings Listeners
+    const gEnableInput = document.getElementById('geofence-enable-input');
+    const gLatInput = document.getElementById('geofence-lat-input');
+    const gLonInput = document.getElementById('geofence-lon-input');
+    const gRadiusInput = document.getElementById('geofence-radius-input');
+    const geofenceIndicator = document.getElementById('geofence-status-indicator');
+
+    gEnableInput.addEventListener('change', (e) => {
+        state.geofence.enabled = e.target.checked;
+        if (state.geofence.enabled) {
+            geofenceIndicator.className = 'status-indicator-light connected';
+        } else {
+            geofenceIndicator.className = 'status-indicator-light disconnected';
+        }
+        if (state.selectedAnimalId) {
+            openAnimalDetails(state.selectedAnimalId);
+        }
+        logToConsole(`Geofencing ${state.geofence.enabled ? 'enabled' : 'disabled'}.`, 'system');
+    });
+
+    gLatInput.addEventListener('change', (e) => {
+        state.geofence.lat = parseFloat(e.target.value) || -6.8223;
+        if (state.selectedAnimalId) openAnimalDetails(state.selectedAnimalId);
+    });
+
+    gLonInput.addEventListener('change', (e) => {
+        state.geofence.lon = parseFloat(e.target.value) || 39.2743;
+        if (state.selectedAnimalId) openAnimalDetails(state.selectedAnimalId);
+    });
+
+    gRadiusInput.addEventListener('change', (e) => {
+        state.geofence.radius = parseFloat(e.target.value) || 100;
+        if (state.selectedAnimalId) openAnimalDetails(state.selectedAnimalId);
+    });
+
+    // GPS & Telemetry Simulator Buttons
+    document.getElementById('btn-sim-gps-safe').addEventListener('click', () => {
+        const cowId = document.getElementById('sim-cow-select').value;
+        const mockPayload = {
+            device: cowId === 'COW-002' ? 'esp32c6_01' : (cowId === 'COW-001' ? 'esp32c6_02' : 'esp32c6_03'),
+            cow_id: cowId,
+            gps_nmea: `$GPRMC,123519,A,0649.3500,S,03916.4460,E,0.0,0.0,040626,,,A*7C`, // -6.8225, 39.2741 (inside)
+            temp: 38.6,
+            pulse: 72,
+            rumination: 'Normal',
+            thi: 71.5
+        };
+        logToConsole(`[Simulator] Publishing mock safe GPS payload for ${cowId}...`, 'sent');
+        handleIncomingTelemetry(JSON.stringify(mockPayload));
+    });
+
+    document.getElementById('btn-sim-gps-danger').addEventListener('click', () => {
+        const cowId = document.getElementById('sim-cow-select').value;
+        const mockPayload = {
+            device: cowId === 'COW-002' ? 'esp32c6_01' : (cowId === 'COW-001' ? 'esp32c6_02' : 'esp32c6_03'),
+            cow_id: cowId,
+            gps_nmea: `$GPRMC,123519,A,0650.1000,S,03917.4000,E,0.0,0.0,040626,,,A*7F`, // -6.8350, 39.2900 (outside)
+            temp: 38.7,
+            pulse: 78,
+            rumination: 'Normal',
+            thi: 71.8
+        };
+        logToConsole(`[Simulator] Publishing mock out-of-bounds GPS payload for ${cowId}...`, 'sent');
+        handleIncomingTelemetry(JSON.stringify(mockPayload));
     });
 }

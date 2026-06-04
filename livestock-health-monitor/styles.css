@@ -1331,3 +1331,63 @@ body {
 .nav-btn:hover:not(.active) {
     color: var(--text-main);
 }
+
+/* --- Geofence Map Card & Container --- */
+.map-card {
+    margin-top: 15px;
+}
+
+.geofence-status {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 8px;
+    text-transform: uppercase;
+}
+
+.geofence-status.state-normal {
+    background-color: var(--status-normal-bg);
+    color: var(--status-normal);
+}
+
+.geofence-status.state-alert {
+    background-color: var(--status-alert-bg);
+    color: var(--status-alert);
+}
+
+.geofence-status.state-awaiting {
+    background-color: var(--status-awaiting-bg);
+    color: var(--status-awaiting);
+}
+
+.map-wrapper {
+    width: 100%;
+    margin-top: 12px;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid var(--border-color);
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);
+}
+
+#detail-map {
+    width: 100%;
+    height: 200px;
+    z-index: 10;
+}
+
+/* Ensure Leaflet controls styling fits nicely */
+.leaflet-bar {
+    border: 1px solid var(--border-color) !important;
+    box-shadow: var(--shadow-sm) !important;
+}
+
+.leaflet-bar a {
+    color: var(--text-main) !important;
+    background-color: var(--card-bg) !important;
+    border-bottom: 1px solid var(--border-color) !important;
+}
+
+.leaflet-bar a:hover {
+    background-color: var(--primary-light) !important;
+    color: var(--primary-color) !important;
+}
