@@ -1,5 +1,6 @@
 {
   "cleanUrls": true,
-  "buildCommand": "",
-  "outputDirectory": "livestock-health-monitor"
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/livestock-health-monitor/$1" }
+  ]
 }

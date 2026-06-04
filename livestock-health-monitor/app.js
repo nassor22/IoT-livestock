@@ -11,7 +11,7 @@ const state = {
         client: null,
         status: 'disconnected', // 'disconnected', 'connecting', 'connected'
         brokerUrl: 'wss://broker.hivemq.com:8884/mqtt',
-        topic: 'sensors/esp32c6/+/telemetry',
+        topic: 'nassor22/sensors/esp32c6/+/telemetry',
         username: '',
         password: '',
         logs: []

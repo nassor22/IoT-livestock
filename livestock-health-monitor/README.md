@@ -37,10 +37,10 @@ Because the app runs inside a web browser, it cannot connect to standard TCP MQT
 
 ### Default Connection Details
 - **Broker WebSocket URL**: `wss://broker.hivemq.com:8884/mqtt` (Secure WebSockets)
-- **Default Topic**: `sensors/esp32c6/+/telemetry` (Wildcard listens to all ESP32-C6 devices)
+- **Default Topic**: `nassor22/sensors/esp32c6/+/telemetry` (Wildcard listens to all ESP32-C6 devices)
 
 ### JSON Telemetry Payload format
-Your MCU should publish a JSON payload to the device topic (`sensors/esp32c6/esp32c6_01/telemetry`). The format is as follows:
+Your MCU should publish a JSON payload to the device topic (`nassor22/sensors/esp32c6/esp32c6_01/telemetry`). The format is as follows:
 
 ```json
 {
@@ -271,8 +271,8 @@ void loop() {
     char out[512];
     serializeJson(doc, out, sizeof(out));
     
-    // Topic: sensors/esp32c6/esp32c6_01/telemetry
-    String topic = String("sensors/esp32c6/") + device_id + "/telemetry";
+    // Topic: nassor22/sensors/esp32c6/esp32c6_01/telemetry
+    String topic = String("nassor22/sensors/esp32c6/") + device_id + "/telemetry";
     if (client.connected()) {
       client.publish(topic.c_str(), out);
     }
