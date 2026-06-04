@@ -1,5 +1,5 @@
 {
   "cleanUrls": true,
-  "buildCommand": null,
+  "buildCommand": "",
   "outputDirectory": "livestock-health-monitor"
 }
