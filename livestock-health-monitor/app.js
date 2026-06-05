@@ -28,6 +28,13 @@ const state = {
         lon: 39.2743,
         radius: 100
     },
+    firebase: {
+        enabled: false,
+        apiKey: '',
+        projectId: '',
+        authDomain: '',
+        appId: ''
+    },
     // Pre-registered animals
     animals: {
         'COW-001': {
@@ -98,6 +105,10 @@ document.addEventListener('DOMContentLoaded', () => {
     initMQTTForm();
     initFilters();
     initSettingsListeners();
+    
+    // Load persisted Firebase config
+    loadFirebaseConfig();
+    initFirebase();
     
     // Initial Render
     updateDashboardStats();
@@ -1417,6 +1428,8 @@ function handleIncomingTelemetry(rawJson) {
 
         logToConsole(`Processed data for ${cowId}: Status = ${newStatus.toUpperCase()}`, 'system');
 
+        // Write parsed telemetry to Firebase database
+        writeTelemetryToFirebase(cowId, cow, rawJson);
     } catch (e) {
         logToConsole(`Parsing Exception: ${e.message}`, 'error');
     }
@@ -1517,4 +1530,156 @@ function initSettingsListeners() {
         logToConsole(`[Simulator] Publishing mock out-of-bounds GPS payload for ${cowId}...`, 'sent');
         handleIncomingTelemetry(JSON.stringify(mockPayload));
     });
+
+    // Firebase configuration event listeners
+    const firebaseEnable = document.getElementById('firebase-enable-input');
+    const saveFirebaseBtn = document.getElementById('btn-save-firebase');
+
+    if (saveFirebaseBtn) {
+        saveFirebaseBtn.addEventListener('click', () => {
+            const apiKey = document.getElementById('firebase-api-key').value.trim();
+            const projectId = document.getElementById('firebase-project-id').value.trim();
+            const authDomain = document.getElementById('firebase-auth-domain').value.trim();
+            const appId = document.getElementById('firebase-app-id').value.trim();
+            const enabled = firebaseEnable.checked;
+
+            state.firebase.apiKey = apiKey;
+            state.firebase.projectId = projectId;
+            state.firebase.authDomain = authDomain;
+            state.firebase.appId = appId;
+            state.firebase.enabled = enabled;
+
+            localStorage.setItem('iot_livestock_firebase_config', JSON.stringify(state.firebase));
+            logToConsole('[Firebase] Configuration saved to local storage.', 'system');
+
+            initFirebase();
+        });
+    }
+}
+
+// --- Firebase Integration Logic ---
+let db = null;
+let firebaseInitialized = false;
+
+function loadFirebaseConfig() {
+    try {
+        const saved = localStorage.getItem('iot_livestock_firebase_config');
+        if (saved) {
+            const parsed = JSON.parse(saved);
+            state.firebase = Object.assign(state.firebase, parsed);
+        }
+    } catch (e) {
+        console.error('Failed to load Firebase config:', e);
+    }
+}
+
+function initFirebase() {
+    populateFirebaseUI();
+    
+    if (!state.firebase || !state.firebase.enabled) {
+        updateFirebaseStatus('disabled');
+        firebaseInitialized = false;
+        return;
+    }
+    
+    const config = state.firebase;
+    if (!config.apiKey || !config.projectId || !config.authDomain || !config.appId) {
+        logToConsole('[Firebase] Missing configuration fields. Sync disabled.', 'error');
+        updateFirebaseStatus('disconnected');
+        firebaseInitialized = false;
+        return;
+    }
+
+    try {
+        // Prevent re-initialization errors if apps list already contains an app
+        if (firebase.apps.length === 0) {
+            firebase.initializeApp({
+                apiKey: config.apiKey,
+                authDomain: config.authDomain,
+                projectId: config.projectId,
+                appId: config.appId
+            });
+        }
+        db = firebase.firestore();
+        firebaseInitialized = true;
+        updateFirebaseStatus('connected');
+        logToConsole(`[Firebase] Initialized successfully for project: ${config.projectId}`, 'system');
+    } catch (e) {
+        firebaseInitialized = false;
+        updateFirebaseStatus('disconnected');
+        logToConsole(`[Firebase] Initialization error: ${e.message}`, 'error');
+    }
+}
+
+function updateFirebaseStatus(status) {
+    const el = document.getElementById('firebase-status-indicator');
+    if (!el) return;
+    el.className = `status-indicator-light ${status}`;
+}
+
+function populateFirebaseUI() {
+    const enableInput = document.getElementById('firebase-enable-input');
+    const apiKeyInput = document.getElementById('firebase-api-key');
+    const projectIdInput = document.getElementById('firebase-project-id');
+    const authDomainInput = document.getElementById('firebase-auth-domain');
+    const appIdInput = document.getElementById('firebase-app-id');
+    
+    if (enableInput) enableInput.checked = state.firebase.enabled;
+    if (apiKeyInput) apiKeyInput.value = state.firebase.apiKey || '';
+    if (projectIdInput) projectIdInput.value = state.firebase.projectId || '';
+    if (authDomainInput) authDomainInput.value = state.firebase.authDomain || '';
+    if (appIdInput) appIdInput.value = state.firebase.appId || '';
+}
+
+function writeTelemetryToFirebase(cowId, cow, rawJson) {
+    if (!firebaseInitialized || !db) return;
+
+    try {
+        const telemetryRecord = {
+            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+            temp: typeof cow.temp === 'number' ? cow.temp : null,
+            pulse: typeof cow.pulse === 'number' ? cow.pulse : null,
+            rumination: cow.rumination || 'Unknown',
+            thi: typeof cow.thi === 'number' ? cow.thi : null,
+            gps: {
+                lat: typeof cow.lat === 'number' ? cow.lat : null,
+                lon: typeof cow.lon === 'number' ? cow.lon : null
+            },
+            status: cow.status || 'normal',
+            raw_payload: rawJson
+        };
+
+        // Append to history subcollection
+        db.collection("livestock")
+            .doc(cowId)
+            .collection("telemetry_history")
+            .add(telemetryRecord)
+            .then(() => {
+                logToConsole(`[Firebase] Telemetry for ${cowId} logged to Firestore history`, 'system');
+            })
+            .catch(err => {
+                logToConsole(`[Firebase] Error writing history: ${err.message}`, 'error');
+            });
+
+        // Update real-time status in main document
+        db.collection("livestock").doc(cowId).set({
+            last_updated: firebase.firestore.FieldValue.serverTimestamp(),
+            current_temp: telemetryRecord.temp,
+            current_pulse: telemetryRecord.pulse,
+            current_rumination: telemetryRecord.rumination,
+            current_thi: telemetryRecord.thi,
+            current_lat: telemetryRecord.gps.lat,
+            current_lon: telemetryRecord.gps.lon,
+            status: telemetryRecord.status
+        }, { merge: true })
+        .then(() => {
+            logToConsole(`[Firebase] Real-time state updated for ${cowId}`, 'system');
+        })
+        .catch(err => {
+            logToConsole(`[Firebase] Error updating real-time: ${err.message}`, 'error');
+        });
+
+    } catch (e) {
+        logToConsole(`[Firebase] Exception writing to database: ${e.message}`, 'error');
+    }
 }

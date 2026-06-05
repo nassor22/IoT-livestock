@@ -25,6 +25,10 @@
     <!-- Leaflet Maps CSS & JS CDN -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <!-- Firebase Compat SDKs (App and Firestore) -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 </head>
 <body>
     <div class="app-container">
@@ -425,6 +429,49 @@
                                 <button class="btn btn-primary" id="btn-sim-gps-safe" style="flex: 1; min-width: 120px; font-size: 11px; padding: 8px 10px;">Simulate Inside Bounds</button>
                                 <button class="btn btn-danger" id="btn-sim-gps-danger" style="flex: 1; min-width: 120px; font-size: 11px; padding: 8px 10px;">Simulate Out of Bounds</button>
                             </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Firebase Database Settings -->
+                <div class="settings-card">
+                    <div class="card-title-row">
+                        <i data-lucide="database" class="card-icon text-red"></i>
+                        <h2>Firebase Database Sync</h2>
+                        <span class="status-indicator-light disconnected" id="firebase-status-indicator"></span>
+                    </div>
+                    
+                    <div class="settings-form">
+                        <div class="form-group">
+                            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+                                <label for="firebase-enable-input">Enable Firebase Sync</label>
+                                <input type="checkbox" id="firebase-enable-input" style="width: 20px; height: 20px; margin: 0; cursor: pointer;">
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="firebase-api-key">API Key</label>
+                            <input type="password" id="firebase-api-key" placeholder="AIzaSyA1...">
+                        </div>
+                        
+                        <div class="form-row-2">
+                            <div class="form-group">
+                                <label for="firebase-project-id">Project ID</label>
+                                <input type="text" id="firebase-project-id" placeholder="iot-livestock">
+                            </div>
+                            <div class="form-group">
+                                <label for="firebase-auth-domain">Auth Domain</label>
+                                <input type="text" id="firebase-auth-domain" placeholder="iot-livestock.firebaseapp.com">
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="firebase-app-id">App ID</label>
+                            <input type="text" id="firebase-app-id" placeholder="1:12345:web:abcd">
+                        </div>
+                        
+                        <div style="margin-top: 12px;">
+                            <button class="btn btn-primary" id="btn-save-firebase" style="width: 100%;">Save & Initialize Firebase</button>
                         </div>
                     </div>
                 </div>
