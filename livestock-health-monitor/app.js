@@ -37,8 +37,8 @@ const state = {
     },
     // Pre-registered animals
     animals: {
-        'COW-001': {
-            id: 'COW-001',
+        'COW': {
+            id: 'COW',
             breed: 'Dairy Cow',
             age: '3 years',
             status: 'awaiting',
@@ -53,10 +53,10 @@ const state = {
                 '30D': { labels: ['Wk 1', 'Wk 2', 'Wk 3', 'Wk 4'], temp: [], activity: [] }
             }
         },
-        'COW-002': {
-            id: 'COW-002',
-            breed: 'Brahman Bull',
-            age: '5 years',
+        'GOAT': {
+            id: 'GOAT',
+            breed: 'Boer Goat',
+            age: '2 years',
             status: 'awaiting', // Starts as awaiting data based on Image 4
             temp: null,
             pulse: null,
@@ -69,10 +69,10 @@ const state = {
                 '30D': { labels: ['Wk 1', 'Wk 2', 'Wk 3', 'Wk 4'], temp: [], activity: [] }
             }
         },
-        'COW-003': {
-            id: 'COW-003',
-            breed: 'Hereford',
-            age: '2 years',
+        'SHEEP': {
+            id: 'SHEEP',
+            breed: 'Dorper Sheep',
+            age: '1 year',
             status: 'awaiting', // Starts as awaiting data
             temp: null,
             pulse: null,
@@ -368,7 +368,7 @@ function createAnimalCard(animal) {
             </div>
             <div class="animal-details">
                 <h3>${animal.id}</h3>
-                <p>${animal.breed} • ${animal.age}</p>
+                <p>${animal.breed} â€¢ ${animal.age}</p>
             </div>
         </div>
         <div class="status-pill state-${animal.status}">
@@ -405,19 +405,19 @@ function openAnimalDetails(cowId) {
         breedAgeEl.innerText = 'Awaiting live sensor data';
         statusText.innerText = 'Awaiting data';
         
-        document.getElementById('detail-reading-temp').innerText = '--°C';
+        document.getElementById('detail-reading-temp').innerText = '--Â°C';
         document.getElementById('detail-reading-temp').className = 'reading-value font-jakarta';
         document.getElementById('detail-reading-pulse').innerText = '-- bpm';
         document.getElementById('detail-reading-pulse').className = 'reading-value font-jakarta';
         document.getElementById('detail-reading-rumination').innerText = 'Unknown';
         document.getElementById('detail-reading-updated').innerText = 'Waiting for sensor data';
     } else {
-        breedAgeEl.innerText = `${animal.breed} • ${animal.age}`;
+        breedAgeEl.innerText = `${animal.breed} â€¢ ${animal.age}`;
         statusText.innerText = animal.status;
 
         // Readings Values & Colors
         const tempValEl = document.getElementById('detail-reading-temp');
-        tempValEl.innerText = `${animal.temp.toFixed(1)}°C`;
+        tempValEl.innerText = `${animal.temp.toFixed(1)}Â°C`;
         tempValEl.className = `reading-value font-jakarta ${getReadingColorClass('temp', animal.temp)}`;
 
         const pulseValEl = document.getElementById('detail-reading-pulse');
@@ -445,7 +445,7 @@ function openAnimalDetails(cowId) {
     const distanceEl = document.getElementById('detail-reading-distance');
 
     if (animal.lat && animal.lon) {
-        coordsEl.innerText = `${animal.lat.toFixed(5)}°, ${animal.lon.toFixed(5)}°`;
+        coordsEl.innerText = `${animal.lat.toFixed(5)}Â°, ${animal.lon.toFixed(5)}Â°`;
         if (state.geofence.enabled) {
             const dist = calculateDistance(animal.lat, animal.lon, state.geofence.lat, state.geofence.lon);
             distanceEl.innerText = `${Math.round(dist)} m`;
@@ -520,7 +520,7 @@ function initMap(cowId) {
         // Add OpenStreetMap tiles
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 19,
-            attribution: '© OpenStreetMap contributors'
+            attribution: 'Â© OpenStreetMap contributors'
         }).addTo(leafletMapInstance);
         
         // Draw Geofence boundaries
@@ -680,7 +680,7 @@ function initCharts(cowId) {
         data: {
             labels: hasData ? tempHistory.labels : ['No Data'],
             datasets: [{
-                label: 'Temperature (°C)',
+                label: 'Temperature (Â°C)',
                 data: hasData ? tempHistory.temp : [null],
                 borderColor: '#e53935',
                 borderWidth: 2.5,
@@ -705,7 +705,7 @@ function initCharts(cowId) {
                     bodyFont: { family: 'Plus Jakarta Sans', size: 12 },
                     callbacks: {
                         label: function(context) {
-                            return ` ${context.parsed.y.toFixed(1)}°C`;
+                            return ` ${context.parsed.y.toFixed(1)}Â°C`;
                         }
                     }
                 }
@@ -1175,13 +1175,13 @@ function handleIncomingTelemetry(rawJson) {
         if (rawCowId) {
             let cleanId = String(rawCowId).trim().toUpperCase();
             
-            // Normalize common inputs to COW-001, COW-002, COW-003
-            if (cleanId === '001' || cleanId === '1' || cleanId === 'COW-001') {
-                cowId = 'COW-001';
-            } else if (cleanId === '002' || cleanId === '2' || cleanId === 'COW-002' || cleanId === 'ESP32C6_01') {
-                cowId = 'COW-002';
-            } else if (cleanId === '003' || cleanId === '3' || cleanId === 'COW-003') {
-                cowId = 'COW-003';
+            // Normalize common inputs to COW, GOAT, SHEEP
+            if (cleanId === '001' || cleanId === '1' || cleanId === 'COW-001' || cleanId === 'COW') {
+                cowId = 'COW';
+            } else if (cleanId === '002' || cleanId === '2' || cleanId === 'COW-002' || cleanId === 'ESP32C6_01' || cleanId === 'GOAT') {
+                cowId = 'GOAT';
+            } else if (cleanId === '003' || cleanId === '3' || cleanId === 'COW-003' || cleanId === 'SHEEP') {
+                cowId = 'SHEEP';
             } else {
                 cowId = cleanId;
             }
@@ -1212,7 +1212,7 @@ function handleIncomingTelemetry(rawJson) {
         let temp = parseFloat(rawTemp);
         if (temp === -127.0 || (typeof rawTemp === 'string' && rawTemp.toLowerCase().includes('error')) || isNaN(temp)) {
             temp = 38.8; // Fallback temperature if sensor error is transmitted
-            logToConsole(`[Warning] Temp sensor error (${rawTemp}°C) reported from MCU. Using fallback.`, 'error');
+            logToConsole(`[Warning] Temp sensor error (${rawTemp}Â°C) reported from MCU. Using fallback.`, 'error');
         }
 
         // Pulse parsing with fallback for raw pulse signal percent or raw ADC value
@@ -1337,7 +1337,7 @@ function handleIncomingTelemetry(rawJson) {
             
             // Only trigger sensor alert if it's not purely a geofence breach
             if (temp > state.thresholds.tempNormalMax || pulse > state.thresholds.pulseNormalMax || pulse < state.thresholds.pulseNormalMin || pulse > 100 || pulse < 40) {
-                const alertMessage = `Body temp ${temp.toFixed(1)}°C · Pulse ${pulse} bpm · THI ${thi.toFixed(1)}`;
+                const alertMessage = `Body temp ${temp.toFixed(1)}Â°C Â· Pulse ${pulse} bpm Â· THI ${thi.toFixed(1)}`;
                 const existingAlert = state.alerts.find(a => a.cowId === cowId && !a.resolved && a.type === alertType && !a.message.includes('Geofence'));
                 
                 if (!existingAlert) {
@@ -1379,11 +1379,11 @@ function handleIncomingTelemetry(rawJson) {
 
             statusPill.className = `status-pill state-${cow.status}`;
             headerEl.className = `detail-header header-${cow.status}`;
-            breedAgeEl.innerText = `${cow.breed} • ${cow.age}`;
+            breedAgeEl.innerText = `${cow.breed} â€¢ ${cow.age}`;
             statusText.innerText = cow.status;
 
             const tempValEl = document.getElementById('detail-reading-temp');
-            tempValEl.innerText = `${cow.temp.toFixed(1)}°C`;
+            tempValEl.innerText = `${cow.temp.toFixed(1)}Â°C`;
             tempValEl.className = `reading-value font-jakarta ${getReadingColorClass('temp', cow.temp)}`;
 
             const pulseValEl = document.getElementById('detail-reading-pulse');
@@ -1399,7 +1399,7 @@ function handleIncomingTelemetry(rawJson) {
             const distanceEl = document.getElementById('detail-reading-distance');
 
             if (cow.lat && cow.lon) {
-                coordsEl.innerText = `${cow.lat.toFixed(5)}°, ${cow.lon.toFixed(5)}°`;
+                coordsEl.innerText = `${cow.lat.toFixed(5)}Â°, ${cow.lon.toFixed(5)}Â°`;
                 if (state.geofence.enabled) {
                     const dist = calculateDistance(cow.lat, cow.lon, state.geofence.lat, state.geofence.lon);
                     distanceEl.innerText = `${Math.round(dist)} m`;
@@ -1504,7 +1504,7 @@ function initSettingsListeners() {
     document.getElementById('btn-sim-gps-safe').addEventListener('click', () => {
         const cowId = document.getElementById('sim-cow-select').value;
         const mockPayload = {
-            device: cowId === 'COW-002' ? 'esp32c6_01' : (cowId === 'COW-001' ? 'esp32c6_02' : 'esp32c6_03'),
+            device: cowId === 'GOAT' ? 'esp32c6_01' : (cowId === 'COW' ? 'esp32c6_02' : 'esp32c6_03'),
             cow_id: cowId,
             gps_nmea: `$GPRMC,123519,A,0649.3500,S,03916.4460,E,0.0,0.0,040626,,,A*7C`, // -6.8225, 39.2741 (inside)
             temp: 38.6,
@@ -1519,7 +1519,7 @@ function initSettingsListeners() {
     document.getElementById('btn-sim-gps-danger').addEventListener('click', () => {
         const cowId = document.getElementById('sim-cow-select').value;
         const mockPayload = {
-            device: cowId === 'COW-002' ? 'esp32c6_01' : (cowId === 'COW-001' ? 'esp32c6_02' : 'esp32c6_03'),
+            device: cowId === 'GOAT' ? 'esp32c6_01' : (cowId === 'COW' ? 'esp32c6_02' : 'esp32c6_03'),
             cow_id: cowId,
             gps_nmea: `$GPRMC,123519,A,0650.1000,S,03917.4000,E,0.0,0.0,040626,,,A*7F`, // -6.8350, 39.2900 (outside)
             temp: 38.7,
