@@ -405,19 +405,19 @@ function openAnimalDetails(cowId) {
         breedAgeEl.innerText = 'Awaiting live sensor data';
         statusText.innerText = 'Awaiting data';
         
-        document.getElementById('detail-reading-temp').innerText = '--Â°C';
+        document.getElementById('detail-reading-temp').innerText = '--\u00B0C';
         document.getElementById('detail-reading-temp').className = 'reading-value font-jakarta';
         document.getElementById('detail-reading-pulse').innerText = '-- bpm';
         document.getElementById('detail-reading-pulse').className = 'reading-value font-jakarta';
         document.getElementById('detail-reading-rumination').innerText = 'Unknown';
         document.getElementById('detail-reading-updated').innerText = 'Waiting for sensor data';
     } else {
-        breedAgeEl.innerText = `${animal.breed} â€¢ ${animal.age}`;
+        breedAgeEl.innerText = `${animal.breed} \u2022 ${animal.age}`;
         statusText.innerText = animal.status;
 
         // Readings Values & Colors
         const tempValEl = document.getElementById('detail-reading-temp');
-        tempValEl.innerText = `${animal.temp.toFixed(1)}Â°C`;
+        tempValEl.innerText = `${animal.temp.toFixed(1)}\u00B0C`;
         tempValEl.className = `reading-value font-jakarta ${getReadingColorClass('temp', animal.temp)}`;
 
         const pulseValEl = document.getElementById('detail-reading-pulse');
@@ -445,7 +445,7 @@ function openAnimalDetails(cowId) {
     const distanceEl = document.getElementById('detail-reading-distance');
 
     if (animal.lat && animal.lon) {
-        coordsEl.innerText = `${animal.lat.toFixed(5)}Â°, ${animal.lon.toFixed(5)}Â°`;
+        coordsEl.innerText = `${animal.lat.toFixed(5)}\u00B0, ${animal.lon.toFixed(5)}\u00B0`;
         if (state.geofence.enabled) {
             const dist = calculateDistance(animal.lat, animal.lon, state.geofence.lat, state.geofence.lon);
             distanceEl.innerText = `${Math.round(dist)} m`;
@@ -680,7 +680,7 @@ function initCharts(cowId) {
         data: {
             labels: hasData ? tempHistory.labels : ['No Data'],
             datasets: [{
-                label: 'Temperature (Â°C)',
+                label: 'Temperature (\u00B0C)',
                 data: hasData ? tempHistory.temp : [null],
                 borderColor: '#e53935',
                 borderWidth: 2.5,
@@ -705,7 +705,7 @@ function initCharts(cowId) {
                     bodyFont: { family: 'Plus Jakarta Sans', size: 12 },
                     callbacks: {
                         label: function(context) {
-                            return ` ${context.parsed.y.toFixed(1)}Â°C`;
+                            return ` ${context.parsed.y.toFixed(1)}\u00B0C`;
                         }
                     }
                 }
@@ -1212,7 +1212,7 @@ function handleIncomingTelemetry(rawJson) {
         let temp = parseFloat(rawTemp);
         if (temp === -127.0 || (typeof rawTemp === 'string' && rawTemp.toLowerCase().includes('error')) || isNaN(temp)) {
             temp = 38.8; // Fallback temperature if sensor error is transmitted
-            logToConsole(`[Warning] Temp sensor error (${rawTemp}Â°C) reported from MCU. Using fallback.`, 'error');
+            logToConsole(`[Warning] Temp sensor error (${rawTemp}\u00B0C) reported from MCU. Using fallback.`, 'error');
         }
 
         // Pulse parsing with fallback for raw pulse signal percent or raw ADC value
@@ -1337,7 +1337,7 @@ function handleIncomingTelemetry(rawJson) {
             
             // Only trigger sensor alert if it's not purely a geofence breach
             if (temp > state.thresholds.tempNormalMax || pulse > state.thresholds.pulseNormalMax || pulse < state.thresholds.pulseNormalMin || pulse > 100 || pulse < 40) {
-                const alertMessage = `Body temp ${temp.toFixed(1)}Â°C Â· Pulse ${pulse} bpm Â· THI ${thi.toFixed(1)}`;
+                const alertMessage = `Body temp ${temp.toFixed(1)}\u00B0C \u00B7 Pulse ${pulse} bpm \u00B7 THI ${thi.toFixed(1)}`;
                 const existingAlert = state.alerts.find(a => a.cowId === cowId && !a.resolved && a.type === alertType && !a.message.includes('Geofence'));
                 
                 if (!existingAlert) {
@@ -1379,11 +1379,11 @@ function handleIncomingTelemetry(rawJson) {
 
             statusPill.className = `status-pill state-${cow.status}`;
             headerEl.className = `detail-header header-${cow.status}`;
-            breedAgeEl.innerText = `${cow.breed} â€¢ ${cow.age}`;
+            breedAgeEl.innerText = `${cow.breed} \u2022 ${cow.age}`;
             statusText.innerText = cow.status;
 
             const tempValEl = document.getElementById('detail-reading-temp');
-            tempValEl.innerText = `${cow.temp.toFixed(1)}Â°C`;
+            tempValEl.innerText = `${cow.temp.toFixed(1)}\u00B0C`;
             tempValEl.className = `reading-value font-jakarta ${getReadingColorClass('temp', cow.temp)}`;
 
             const pulseValEl = document.getElementById('detail-reading-pulse');
@@ -1399,7 +1399,7 @@ function handleIncomingTelemetry(rawJson) {
             const distanceEl = document.getElementById('detail-reading-distance');
 
             if (cow.lat && cow.lon) {
-                coordsEl.innerText = `${cow.lat.toFixed(5)}Â°, ${cow.lon.toFixed(5)}Â°`;
+                coordsEl.innerText = `${cow.lat.toFixed(5)}\u00B0, ${cow.lon.toFixed(5)}\u00B0`;
                 if (state.geofence.enabled) {
                     const dist = calculateDistance(cow.lat, cow.lon, state.geofence.lat, state.geofence.lon);
                     distanceEl.innerText = `${Math.round(dist)} m`;
