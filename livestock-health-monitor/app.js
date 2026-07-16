@@ -309,7 +309,7 @@ function renderHomeLivestock() {
     if (filtered.length === 0) {
         listContainer.innerHTML = `
             <div class="empty-state">
-                <div class="empty-icon-wrapper"><i data-lucide="cow" class="empty-icon"></i></div>
+                <div class="empty-icon-wrapper"><i data-lucide="paw-print" class="empty-icon"></i></div>
                 <p>No animals in this category.</p>
             </div>`;
         lucide.createIcons();
@@ -364,11 +364,11 @@ function createAnimalCard(animal) {
     card.innerHTML = `
         <div class="animal-card-left">
             <div class="animal-avatar-box state-${animal.status}">
-                <i data-lucide="cow"></i>
+                <i data-lucide="paw-print"></i>
             </div>
             <div class="animal-details">
                 <h3>${animal.id}</h3>
-                <p>${animal.breed} â€¢ ${animal.age}</p>
+                <p>${animal.breed} \u2022 ${animal.age}</p>
             </div>
         </div>
         <div class="status-pill state-${animal.status}">
