@@ -24,8 +24,8 @@ const state = {
     },
     geofence: {
         enabled: true,
-        lat: -6.8223,
-        lon: 39.2743,
+        lat: -6.771297,
+        lon: 39.240020,
         radius: 100
     },
     firebase: {
@@ -1506,7 +1506,7 @@ function initSettingsListeners() {
         const mockPayload = {
             device: cowId === 'GOAT' ? 'esp32c6_01' : (cowId === 'COW' ? 'esp32c6_02' : 'esp32c6_03'),
             cow_id: cowId,
-            gps_nmea: `$GPRMC,123519,A,0649.3500,S,03916.4460,E,0.0,0.0,040626,,,A*7C`, // -6.8225, 39.2741 (inside)
+            gps_nmea: `$GPRMC,123519,A,0646.2778,S,03914.4012,E,0.0,0.0,040626,,,A*7C`, // -6.771297, 39.240020 (inside)
             temp: 38.6,
             pulse: 72,
             rumination: 'Normal',
@@ -1521,7 +1521,7 @@ function initSettingsListeners() {
         const mockPayload = {
             device: cowId === 'GOAT' ? 'esp32c6_01' : (cowId === 'COW' ? 'esp32c6_02' : 'esp32c6_03'),
             cow_id: cowId,
-            gps_nmea: `$GPRMC,123519,A,0650.1000,S,03917.4000,E,0.0,0.0,040626,,,A*7F`, // -6.8350, 39.2900 (outside)
+            gps_nmea: `$GPRMC,123519,A,0646.8000,S,03915.0000,E,0.0,0.0,040626,,,A*7F`, // -6.7800, 39.2500 (outside)
             temp: 38.7,
             pulse: 78,
             rumination: 'Normal',
