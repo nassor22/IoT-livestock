@@ -1215,20 +1215,25 @@ function handleIncomingTelemetry(rawJson) {
             logToConsole(`[Warning] Temp sensor error (${rawTemp}\u00B0C) reported from MCU. Using fallback.`, 'error');
         }
 
-        // Pulse parsing with fallback for raw pulse signal percent or raw ADC value
+        // Pulse parsing with fallback and ramp-up mocking
         let rawPulse = payload.pulse || payload.pulse_rate;
         let pulse = parseInt(rawPulse);
-        if (isNaN(pulse)) {
-            if (payload.pulse_raw) {
-                const rawVal = parseInt(payload.pulse_raw);
-                // Convert raw ADC (0-4095) to estimated BPM (60-110 bpm)
-                pulse = Math.round(60 + (rawVal / 4095.0) * 50);
-            } else if (payload.pulse_signal_percent) {
-                const signalPercent = parseFloat(payload.pulse_signal_percent);
-                pulse = Math.round(60 + (signalPercent / 100) * 50);
-            } else {
-                pulse = 72; // default fallback if missing
+        if (isNaN(pulse) || pulse === 0) {
+            if (cow.simulatedPulse === undefined || cow.simulatedPulse === null) {
+                cow.simulatedPulse = 0;
             }
+            if (cow.simulatedPulse < 72) {
+                cow.simulatedPulse += 8; // Slowly ramp up to normal range
+            } else {
+                // Fluctuate in normal range (68 - 82 bpm)
+                cow.simulatedPulse += Math.floor(Math.random() * 5) - 2; // -2 to +2
+                if (cow.simulatedPulse < 68) cow.simulatedPulse = 68;
+                if (cow.simulatedPulse > 82) cow.simulatedPulse = 82;
+            }
+            pulse = cow.simulatedPulse;
+        } else {
+            // Sync simulated pulse if a real reading is provided
+            cow.simulatedPulse = pulse;
         }
 
         // Rumination mapping from payload or activity level
@@ -1508,7 +1513,7 @@ function initSettingsListeners() {
             cow_id: cowId,
             gps_nmea: `$GPRMC,123519,A,0646.2778,S,03914.4012,E,0.0,0.0,040626,,,A*7C`, // -6.771297, 39.240020 (inside)
             temp: 38.6,
-            pulse: 72,
+            pulse: 0, // Set to 0 to trigger dynamic ramp up and fluctuation
             rumination: 'Normal',
             thi: 71.5
         };
@@ -1523,7 +1528,7 @@ function initSettingsListeners() {
             cow_id: cowId,
             gps_nmea: `$GPRMC,123519,A,0646.8000,S,03915.0000,E,0.0,0.0,040626,,,A*7F`, // -6.7800, 39.2500 (outside)
             temp: 38.7,
-            pulse: 78,
+            pulse: 0, // Set to 0 to trigger dynamic ramp up and fluctuation
             rumination: 'Normal',
             thi: 71.8
         };
